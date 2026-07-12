@@ -94,3 +94,14 @@ export const machineVotes = sqliteTable("machine_votes", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+// --- Weekly summary articles (SEO long-tail content, auto-generated from collected data) ---
+export const weeklySummaries = sqliteTable("weekly_summaries", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  weekOf: text("week_of").notNull().unique(), // YYYY-MM-DD (Monday of that week)
+  title: text("title").notNull(),
+  bodyMarkdown: text("body_markdown").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
