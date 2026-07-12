@@ -1,0 +1,80 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-rise: var(--accent-rise);
+  --color-fall: var(--accent-fall);
+  --color-gold: var(--accent-gold);
+  --color-info: var(--accent-blue);
+  --font-sans: "Noto Sans JP", "Poppins", sans-serif;
+  --font-display: "Poppins", "Noto Sans JP", sans-serif;
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* パチログ dark theme (see design.md) */
+  --background: #0b0e14;
+  --foreground: #f2f5f9;
+  --card: #141924;
+  --card-foreground: #f2f5f9;
+  --popover: #141924;
+  --popover-foreground: #f2f5f9;
+  --primary: #4c8dff;
+  --primary-foreground: #0b0e14;
+  --secondary: #1b2230;
+  --secondary-foreground: #f2f5f9;
+  --muted: #1b2230;
+  --muted-foreground: #8b96a8;
+  --accent: #1b2230;
+  --accent-foreground: #f2f5f9;
+  --destructive: #ff5c7a;
+  --border: #262e3d;
+  --input: #1b2230;
+  --ring: #4c8dff;
+
+  --accent-rise: #34f5a3;
+  --accent-fall: #ff5c7a;
+  --accent-gold: #ffc857;
+  --accent-blue: #4c8dff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    background-image: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(76, 141, 255, 0.12), transparent);
+    background-attachment: fixed;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
