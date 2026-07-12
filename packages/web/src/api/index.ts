@@ -5,6 +5,7 @@ import { rankings } from "./routes/rankings";
 import { collect } from "./routes/collect";
 import { machinesRoute } from "./routes/machines";
 import { collectMachines } from "./routes/collect-machines";
+import { weekly } from "./routes/weekly";
 
 const app = new Hono()
   .basePath('api')
@@ -15,7 +16,8 @@ const app = new Hono()
   .route('/rankings', rankings)
   .route('/collect', collect)
   .route('/machines', machinesRoute)
-  .route('/collect-machines', collectMachines);
+  .route('/collect-machines', collectMachines)
+  .route('/weekly', weekly);
 
 export type AppType = typeof app;
 export default app;
