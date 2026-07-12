@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "../database";
 import { channels, channelSnapshots, votes } from "../database/schema";
+import { rateLimit } from "../middleware/rate-limit";
 
 export const channelsRoute = new Hono()
   .get("/", async (c) => {
@@ -56,7 +57,7 @@ export const channelsRoute = new Hono()
     const total = counts.good + counts.bad + counts.unknown;
     return c.json({ counts, total }, 200);
   })
-  .post("/:id/votes", async (c) => {
+  .post("/:id/votes", rateLimit({ limit: 5, windowMs: 60_000 }), async (c) => {
     const id = Number(c.req.param("id"));
     const body = await c.req.json<{ voteType: "good" | "bad" | "unknown"; voterFingerprint: string }>();
     if (!["good", "bad", "unknown"].includes(body.voteType) || !body.voterFingerprint) {
