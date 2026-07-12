@@ -43,7 +43,7 @@ docker tag pachilog asia-northeast1-docker.pkg.dev/<プロジェクトID>/pachil
 docker push asia-northeast1-docker.pkg.dev/<プロジェクトID>/pachilog-repo/pachilog
 ```
 
-## 4. Cloud Runにデプロイ
+## 4. Cloud Runにデプロイ(無料運用を狙う設定)
 
 ```bash
 gcloud run deploy pachilog \
@@ -51,10 +51,22 @@ gcloud run deploy pachilog \
   --region=asia-northeast1 \
   --platform=managed \
   --allow-unauthenticated \
+  --min-instances=0 \
+  --max-instances=1 \
+  --cpu=1 \
+  --memory=512Mi \
   --set-env-vars="DATABASE_URL=<値>,DATABASE_AUTH_TOKEN=<値>,YOUTUBE_API_KEY=<値>,COLLECT_SECRET_TOKEN=<値>"
 ```
 
+- **`--min-instances=0`**: アクセスが無い間はインスタンス0台=課金ゼロ
+- **`--max-instances=1`**: 急なアクセス集中やDoS的なアクセスでインスタンスが増殖して課金が跳ねるのを防ぐ(この規模のMVPでは1台で十分)。コードの投票API側にも簡易レート制限(1IPあたり1分5回まで、`packages/web/src/api/middleware/rate-limit.ts`)を入れて二重に防御している
+
 デプロイ完了後、`https://pachilog-xxxxx-an.a.run.app` のようなURLが発行される。
+
+### 予算アラートの設定(必須)
+
+Cloud Consoleの「お支払い」→「予算とアラート」で、100円・500円・1,000円の3段階でアラートを設定する。
+**予算アラートは通知するだけで、請求を自動停止する機能ではない。** 実際の防御は上記の`--max-instances=1`とAPIのレート制限で行う。
 
 ## 5. n8nの収集エンドポイントURLを更新
 
@@ -74,9 +86,18 @@ gcloud run domain-mappings create --service=pachilog --domain=your-domain.com --
 
 Cloud Runの無料枠(2026年時点の一般的な水準):
 - 月200万リクエストまで無料
-- 月36万GB秒のメモリ、月18万vCPU秒まで無料
+- 月18万vCPU秒、月36万GiB秒のメモリまで無料
+- 北米リージョンからの外向き通信1GBまで無料(東京リージョンは条件が異なる場合があるので注意)
 
-パチログ規模(個人サイト・立ち上げ期)のアクセス量なら、無料枠内で収まる可能性が高い。ただし急激なアクセス増加時は課金が発生し得るので、ステップ1の予算アラートは必ず設定しておくこと。
+パチログの構成(DBはTurso無料枠、YouTube APIも無料枠、画像/動画は自前配信しない、AI処理なし、min-instances=0)なら、月額0円にかなり近づけられる。ただし完全な0円保証ではなく、以下は少額発生し得る:
+
+- Artifact Registryのコンテナ保存容量(月0.5GiBまでは無料)
+- Cloud Buildのビルド時間(月2,500分までは無料)
+- Cloud Loggingの大量ログ
+- Cloud RunからTursoへの通信
+- 独自ドメインの購入代(年1,000円〜)
+
+小規模な個人サイト1つなら、これらもほぼ無料枠に収まる規模。**現実的な目標値は「月0〜数百円」**として見ておくのが正確。
 
 ## Runableとの違い(移行判断の参考)
 
