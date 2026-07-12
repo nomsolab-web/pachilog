@@ -19,6 +19,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link to="/machines" className="text-muted-foreground hover:text-foreground transition-colors">
               新台バズ
             </Link>
+            <Link to="/weekly" className="text-muted-foreground hover:text-foreground transition-colors">
+              週刊まとめ
+            </Link>
           </nav>
         </div>
       </header>
