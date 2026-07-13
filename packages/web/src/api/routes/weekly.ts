@@ -95,7 +95,7 @@ export const weekly = new Hono()
     lines.push("");
 
     lines.push("## 新台バズランキング TOP5", "");
-    if (topMachines.length === 0 || topMachines.every((m) => m.totalViews === 0)) {
+    if (topMachines.every((m) => m.totalViews === 0)) {
       lines.push("まだバズデータが十分に溜まっていません。");
     } else {
       topMachines.forEach((m, i) => {

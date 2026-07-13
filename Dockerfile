@@ -5,8 +5,6 @@ WORKDIR /app
 # Install deps (root workspace so packages/web resolves correctly)
 COPY package.json bun.lock ./
 COPY packages/web/package.json packages/web/package.json
-COPY packages/mobile/package.json packages/mobile/package.json
-COPY packages/desktop/package.json packages/desktop/package.json
 RUN bun install --frozen-lockfile
 
 COPY . .

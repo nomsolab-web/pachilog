@@ -68,7 +68,7 @@ export function ShareButton({ name, subscriberCount, deltaPct }: Props) {
 
   return (
     <div className="flex gap-2">
-      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" aria-label="シェア画像生成用キャンバス" />
       <button
         onClick={handleDownload}
         className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm font-medium hover:bg-secondary transition-colors"

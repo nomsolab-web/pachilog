@@ -2,11 +2,8 @@ import { Hono } from "hono";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../database";
 import { channels, channelSnapshots } from "../database/schema";
+import { dateStringInTimeZone } from "../lib/date";
 import { fetchChannelByHandle, fetchChannelsByIds } from "../lib/youtube";
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-}
 
 export const collect = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -14,7 +11,16 @@ export const collect = new Hono().post("/run", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
 
-  const results = { resolved: 0, snapshotsInserted: 0, skippedExisting: 0, errors: [] as string[] };
+  const date = dateStringInTimeZone();
+  const results = {
+    date,
+    resolved: 0,
+    channelsRequested: 0,
+    channelsFetched: 0,
+    snapshotsInserted: 0,
+    skippedExisting: 0,
+    errors: [] as string[],
+  };
 
   // 1. Resolve any active channels that only have a handle (no youtube_channel_id yet)
   const unresolved = await db
@@ -50,11 +56,19 @@ export const collect = new Hono().post("/run", async (c) => {
     .where(and(eq(channels.active, true)));
 
   const withIds = active.filter((ch) => !!ch.youtubeChannelId);
+  results.channelsRequested = withIds.length;
   const idToChannel = new Map(withIds.map((ch) => [ch.youtubeChannelId as string, ch]));
 
   if (withIds.length > 0) {
     const stats = await fetchChannelsByIds(withIds.map((ch) => ch.youtubeChannelId as string));
-    const date = todayStr();
+    results.channelsFetched = stats.length;
+
+    const fetchedIds = new Set(stats.map((item) => item.channelId));
+    for (const ch of withIds) {
+      if (ch.youtubeChannelId && !fetchedIds.has(ch.youtubeChannelId)) {
+        results.errors.push(`${ch.name}: channel statistics were not returned by YouTube`);
+      }
+    }
 
     for (const s of stats) {
       const ch = idToChannel.get(s.channelId);

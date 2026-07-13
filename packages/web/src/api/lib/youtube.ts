@@ -6,6 +6,15 @@ function apiKey() {
   return key;
 }
 
+async function youtubeJson(url: string, operation: string) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 500);
+    throw new Error(`YouTube API ${operation} failed (${res.status}): ${detail}`);
+  }
+  return res.json();
+}
+
 export type YoutubeChannelStats = {
   channelId: string;
   name: string;
@@ -18,12 +27,7 @@ export type YoutubeChannelStats = {
 export async function fetchChannelByHandle(handle: string): Promise<YoutubeChannelStats | null> {
   const cleanHandle = handle.startsWith("@") ? handle : `@${handle}`;
   const url = `${YT_API_BASE}/channels?part=snippet,statistics&forHandle=${encodeURIComponent(cleanHandle)}&key=${apiKey()}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`YouTube API error for handle ${cleanHandle}: ${res.status} ${await res.text()}`);
-    return null;
-  }
-  const data = await res.json();
+  const data = await youtubeJson(url, `channel lookup for ${cleanHandle}`);
   const item = data.items?.[0];
   if (!item) return null;
   return mapChannelItem(item);
@@ -34,12 +38,7 @@ export async function fetchChannelsByIds(channelIds: string[]): Promise<YoutubeC
   for (let i = 0; i < channelIds.length; i += 50) {
     const batch = channelIds.slice(i, i + 50);
     const url = `${YT_API_BASE}/channels?part=snippet,statistics&id=${batch.join(",")}&key=${apiKey()}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.error(`YouTube API error for batch: ${res.status} ${await res.text()}`);
-      continue;
-    }
-    const data = await res.json();
+    const data = await youtubeJson(url, "channel statistics lookup");
     for (const item of data.items ?? []) {
       results.push(mapChannelItem(item));
     }
@@ -62,17 +61,13 @@ export type VideoStats = {
 
 export async function fetchUploadsPlaylistId(channelId: string): Promise<string | null> {
   const url = `${YT_API_BASE}/channels?part=contentDetails&id=${channelId}&key=${apiKey()}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
+  const data = await youtubeJson(url, "uploads playlist lookup");
   return data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads ?? null;
 }
 
 export async function fetchRecentVideos(playlistId: string, maxResults = 25): Promise<RecentVideo[]> {
   const url = `${YT_API_BASE}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=${maxResults}&key=${apiKey()}`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await youtubeJson(url, "recent videos lookup");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data.items ?? []).map((item: any) => ({
     videoId: item.snippet?.resourceId?.videoId,
@@ -86,9 +81,7 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
     const url = `${YT_API_BASE}/videos?part=statistics&id=${batch.join(",")}&key=${apiKey()}`;
-    const res = await fetch(url);
-    if (!res.ok) continue;
-    const data = await res.json();
+    const data = await youtubeJson(url, "video statistics lookup");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const item of data.items ?? []) {
       results.push({
