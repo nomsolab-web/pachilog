@@ -79,7 +79,7 @@ export function ShareButton({ name, subscriberCount, deltaPct }: Props) {
       </button>
       <button
         onClick={handleShareX}
-        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gold text-[#0b0e14] py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-gold text-primary-foreground py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
       >
         <Share2 className="size-4" />
         Xでシェア

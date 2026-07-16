@@ -13,7 +13,7 @@ function MachinePage() {
   });
 
   if (detail.isLoading) {
-    return <div className="animate-pulse h-64 rounded-xl border border-border bg-card" />;
+    return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
   }
 
   if (detail.isError || !detail.data || "error" in detail.data) {
@@ -38,14 +38,14 @@ function MachinePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-xl border surface-card p-4">
           <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
             <Flame className="size-3.5" />
             合計再生数(バズ指数)
           </p>
           <p className="font-display font-bold text-2xl">{totalViews.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4">
+        <div className="rounded-xl border surface-card p-4">
           <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
             <Eye className="size-3.5" />
             関連動画数
@@ -72,7 +72,7 @@ function MachinePage() {
                 href={`https://www.youtube.com/watch?v=${m.videoId}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block rounded-xl border border-border bg-card px-4 py-3 hover:bg-[var(--secondary)] transition-colors"
+                className="interactive-card block rounded-xl border px-4 py-3"
               >
                 <p className="font-medium text-sm mb-1 truncate">{m.videoTitle}</p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">

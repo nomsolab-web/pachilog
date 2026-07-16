@@ -23,7 +23,7 @@ function WeeklyPage() {
       {list.isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl border border-border bg-card animate-pulse" />
+            <div key={i} className="h-16 rounded-xl border surface-card animate-pulse" />
           ))}
         </div>
       ) : !list.data || list.data.summaries.length === 0 ? (
@@ -36,7 +36,7 @@ function WeeklyPage() {
             <Link
               key={s.id}
               to={`/weekly/${s.weekOf}`}
-              className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-[var(--secondary)] transition-colors"
+              className="interactive-card flex items-center gap-3 rounded-xl border px-4 py-3"
             >
               <Newspaper className="size-4 text-gold shrink-0" />
               <div className="min-w-0">

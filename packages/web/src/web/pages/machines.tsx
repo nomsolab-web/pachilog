@@ -23,7 +23,7 @@ function MachinesPage() {
       {machines.isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="h-28 rounded-xl border border-border bg-card animate-pulse" />
+            <div key={index} className="h-28 rounded-xl border surface-card animate-pulse" />
           ))}
         </div>
       ) : machines.isError || !machines.data ? (
@@ -38,7 +38,7 @@ function MachinesPage() {
             <Link
               key={machine.id}
               to={`/machines/${machine.id}`}
-              className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:bg-[var(--secondary)]"
+              className="interactive-card flex items-center gap-4 rounded-xl border p-4"
             >
               <div className="font-display font-bold text-xl text-muted-foreground w-8 text-center">
                 {index + 1}

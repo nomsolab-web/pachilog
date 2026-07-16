@@ -26,7 +26,7 @@ export function MachineVoteWidget({ machineId }: { machineId: number }) {
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-xl border surface-card p-4">
       <p className="text-sm font-medium mb-3">この新台、気になる？</p>
       <div className="flex gap-2">
         <button

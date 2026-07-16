@@ -30,14 +30,14 @@ function Index() {
 
   return (
     <div>
-      <section className="mb-10">
-        <h1 className="font-display font-extrabold text-3xl mb-3">
+      <section className="site-hero rounded-2xl px-5 py-6 mb-10 sm:px-7 sm:py-8">
+        <h1 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
           パチンコパチスロ系YouTuber、今伸びてるのは？
         </h1>
-        <p className="text-muted-foreground max-w-3xl">
+        <p className="text-muted-foreground max-w-3xl leading-7">
           チャンネル登録者数と再生数の推移を毎日自動で集計し、直近の伸びをランキング化しています。期待値や攻略情報ではなく、公開データの変化だけを扱います。
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="size-4" />
             最終更新日: {formatJapaneseDate(latestDate)}
@@ -50,11 +50,11 @@ function Index() {
 
       <section>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div className="flex gap-1 rounded-lg border border-border p-1 bg-card">
+          <div className="segmented-control flex gap-1 rounded-lg border p-1">
             <button
               onClick={() => setTab("rising")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "rising" ? "bg-rise/15 text-rise" : "text-muted-foreground"
+              className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
+                tab === "rising" ? "segmented-button-active bg-rise/15 text-rise" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <TrendingUp className="size-4" />
@@ -62,8 +62,8 @@ function Index() {
             </button>
             <button
               onClick={() => setTab("falling")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "falling" ? "bg-fall/15 text-fall" : "text-muted-foreground"
+              className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
+                tab === "falling" ? "segmented-button-active bg-fall/15 text-fall" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <TrendingDown className="size-4" />
@@ -71,13 +71,13 @@ function Index() {
             </button>
           </div>
 
-          <div className="flex gap-1 rounded-lg border border-border p-1 bg-card">
+          <div className="segmented-control flex gap-1 rounded-lg border p-1">
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPeriod(p.value)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  period === p.value ? "bg-secondary text-foreground" : "text-muted-foreground"
+                className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  period === p.value ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {p.label}
@@ -89,11 +89,11 @@ function Index() {
         {rankings.isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[68px] rounded-xl border border-border bg-card animate-pulse" />
+              <div key={i} className="h-[68px] rounded-xl border surface-card animate-pulse" />
             ))}
           </div>
         ) : list.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl">
+          <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl surface-card">
             まだランキングに必要なデータがありません。収集が進むとここに表示されます。
           </div>
         ) : (

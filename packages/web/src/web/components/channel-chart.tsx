@@ -14,7 +14,7 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
 
   if (data.length < 2) {
     return (
-      <div className="h-64 flex items-center justify-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
+      <div className="h-64 flex items-center justify-center text-sm text-info border border-dashed border-info/40 rounded-xl bg-info/10">
         データ収集中… まだグラフを描くのに十分な日数が溜まっていません
       </div>
     );

@@ -13,7 +13,7 @@ function WeeklyDetailPage() {
   });
 
   if (detail.isLoading) {
-    return <div className="animate-pulse h-64 rounded-xl border border-border bg-card" />;
+    return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
   }
 
   if (detail.isError || !detail.data || "error" in detail.data) {
@@ -27,7 +27,7 @@ function WeeklyDetailPage() {
         週刊まとめ一覧に戻る
       </Link>
 
-      <article className="prose prose-invert max-w-none rounded-xl border border-border bg-card p-6 [&_h1]:font-display [&_h2]:font-display [&_h1]:text-2xl [&_h2]:text-lg [&_h1]:font-bold [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:mb-2 [&_li]:text-sm [&_p]:text-sm [&_p]:text-muted-foreground">
+      <article className="prose prose-invert max-w-none rounded-xl border surface-card p-6 [&_h1]:font-display [&_h2]:font-display [&_h1]:text-2xl [&_h2]:text-lg [&_h1]:font-bold [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:mb-2 [&_li]:text-sm [&_p]:text-sm [&_p]:text-muted-foreground">
         <ReactMarkdown>{detail.data.summary.bodyMarkdown}</ReactMarkdown>
       </article>
     </div>
