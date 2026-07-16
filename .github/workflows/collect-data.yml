@@ -66,10 +66,22 @@ jobs:
             sleep 1
           done
 
-          channel_result=$(curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "x-collect-secret: ${COLLECT_SECRET_TOKEN}" \
-            http://127.0.0.1:3000/api/collect/run)
+          post_collect() {
+            local url="$1"
+            local body
+            if ! body=$(curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "x-collect-secret: ${COLLECT_SECRET_TOKEN}" \
+              "$url"); then
+              echo "::group::pachilog server log"
+              cat /tmp/pachilog-server.log >&2 || true
+              echo "::endgroup::"
+              return 1
+            fi
+            printf '%s' "$body"
+          }
+
+          channel_result=$(post_collect http://127.0.0.1:3000/api/collect/run)
           echo "Channel collection: ${channel_result}"
           CHANNEL_RESULT="${channel_result}" bun -e '
             const result = JSON.parse(process.env.CHANNEL_RESULT ?? "{}");
@@ -81,10 +93,7 @@ jobs:
             }
           '
 
-          machine_result=$(curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "x-collect-secret: ${COLLECT_SECRET_TOKEN}" \
-            http://127.0.0.1:3000/api/collect-machines/run)
+          machine_result=$(post_collect http://127.0.0.1:3000/api/collect-machines/run)
           echo "Machine collection: ${machine_result}"
           MACHINE_RESULT="${machine_result}" bun -e '
             const result = JSON.parse(process.env.MACHINE_RESULT ?? "{}");

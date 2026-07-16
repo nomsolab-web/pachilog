@@ -21,5 +21,10 @@ const app = new Hono()
   .route("/collect-machines", collectMachines)
   .route("/weekly", weekly);
 
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ error: "internal_server_error", message: err.message }, 500);
+});
+
 export type AppType = typeof app;
 export default app;

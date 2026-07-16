@@ -15,7 +15,12 @@ const server = Bun.serve({
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api")) {
-      return app.fetch(request);
+      try {
+        return await app.fetch(request);
+      } catch (err) {
+        console.error(err);
+        return Response.json({ error: "internal_server_error" }, { status: 500 });
+      }
     }
 
     const filePath = getStaticFilePath(url.pathname);
