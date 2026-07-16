@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { ArrowDown, ArrowUp, Users } from "lucide-react";
 import { formatJapaneseCount } from "../lib/format";
+import { ChannelAvatar } from "./channel-avatar";
 
 type Props = {
   rank: number;
@@ -27,13 +28,7 @@ export function RankingCard({ rank, id, name, thumbnailUrl, latestSubscriberCoun
       <span className="font-display font-bold text-sm text-info bg-info/10 border border-info/30 rounded-lg w-8 h-8 flex items-center justify-center shrink-0">
         {rank}
       </span>
-      {thumbnailUrl ? (
-        <img src={thumbnailUrl} alt={name} className="size-12 rounded-full object-cover border border-border/80" />
-      ) : (
-        <div className="size-12 rounded-full bg-secondary border border-border/80 flex items-center justify-center">
-          <Users className="size-5 text-muted-foreground" />
-        </div>
-      )}
+      <ChannelAvatar name={name} thumbnailUrl={thumbnailUrl} className="size-12 rounded-full" />
       <div className="flex-1 min-w-0">
         <p className="font-semibold truncate">{name}</p>
         <p className="text-xs text-muted-foreground font-display flex items-center gap-1 mt-0.5">

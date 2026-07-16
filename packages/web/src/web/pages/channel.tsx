@@ -5,6 +5,7 @@ import { ArrowLeft, Eye, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { formatJapaneseCount } from "../lib/format";
 import { ChannelChart } from "../components/channel-chart";
+import { ChannelAvatar } from "../components/channel-avatar";
 import { VoteWidget } from "../components/vote-widget";
 import { ShareButton } from "../components/share-button";
 
@@ -41,11 +42,7 @@ function ChannelPage() {
       </Link>
 
       <div className="flex items-center gap-4 mb-6">
-        {channel.thumbnailUrl ? (
-          <img src={channel.thumbnailUrl} alt={channel.name} className="size-16 rounded-full object-cover" />
-        ) : (
-          <div className="size-16 rounded-full bg-secondary" />
-        )}
+        <ChannelAvatar name={channel.name} thumbnailUrl={channel.thumbnailUrl} className="size-16 rounded-full" />
         <div>
           <h1 className="font-display font-bold text-2xl">{channel.name}</h1>
           {channel.handle && <p className="text-sm text-muted-foreground">{channel.handle}</p>}

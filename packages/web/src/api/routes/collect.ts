@@ -86,6 +86,16 @@ export const collect = new Hono().post("/run", async (c) => {
       const ch = idToChannel.get(s.channelId);
       if (!ch) continue;
 
+      if (s.thumbnailUrl !== ch.thumbnailUrl || s.name !== ch.name) {
+        await db
+          .update(channels)
+          .set({
+            name: s.name,
+            thumbnailUrl: s.thumbnailUrl,
+          })
+          .where(eq(channels.id, ch.id));
+      }
+
       const existing = await db
         .select()
         .from(channelSnapshots)

@@ -68,6 +68,10 @@ export function isSuccessfulCollectionRate(fetched: number, requested: number, t
   return fetched / requested >= threshold;
 }
 
+export function selectChannelThumbnailUrl(thumbnails: Record<string, { url?: string } | undefined> | undefined) {
+  return thumbnails?.high?.url ?? thumbnails?.medium?.url ?? thumbnails?.default?.url ?? null;
+}
+
 export async function fetchChannelByHandle(handle: string): Promise<YoutubeChannelStats | null> {
   const cleanHandle = handle.startsWith("@") ? handle : `@${handle}`;
   const url = `${YT_API_BASE}/channels?part=snippet,statistics&forHandle=${encodeURIComponent(cleanHandle)}&key=${apiKey()}`;
@@ -173,7 +177,7 @@ function mapChannelItem(item: any): YoutubeChannelStats {
   return {
     channelId: item.id,
     name: item.snippet?.title ?? "Unknown",
-    thumbnailUrl: item.snippet?.thumbnails?.default?.url ?? null,
+    thumbnailUrl: selectChannelThumbnailUrl(item.snippet?.thumbnails),
     subscriberCount: Number(item.statistics?.subscriberCount ?? 0),
     viewCount: Number(item.statistics?.viewCount ?? 0),
     videoCount: Number(item.statistics?.videoCount ?? 0),

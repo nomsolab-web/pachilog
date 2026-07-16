@@ -4,12 +4,23 @@
 import { eq } from "drizzle-orm";
 import { db } from "../database";
 import { channels } from "../database/schema";
+import { fetchChannelsByIdsSafe } from "../lib/youtube";
 import { SEED_CHANNELS } from "./seed-channels";
 
 async function main() {
   let inserted = 0;
   let updated = 0;
+  const statsById = new Map(
+    process.env.YOUTUBE_API_KEY
+      ? (await fetchChannelsByIdsSafe(SEED_CHANNELS.map((channel) => channel.youtubeChannelId))).items.map((stats) => [
+          stats.channelId,
+          stats,
+        ])
+      : [],
+  );
+
   for (const ch of SEED_CHANNELS) {
+    const stats = statsById.get(ch.youtubeChannelId);
     const existingById = await db.select().from(channels).where(eq(channels.youtubeChannelId, ch.youtubeChannelId));
     if (existingById.length > 0) {
       await db
@@ -17,6 +28,7 @@ async function main() {
         .set({
           handle: ch.handle ?? existingById[0].handle,
           name: ch.name,
+          thumbnailUrl: stats?.thumbnailUrl ?? existingById[0].thumbnailUrl,
           category: ch.category,
           active: ch.active,
         })
@@ -32,6 +44,7 @@ async function main() {
         .set({
           youtubeChannelId: ch.youtubeChannelId,
           name: ch.name,
+          thumbnailUrl: stats?.thumbnailUrl ?? existingByHandle[0].thumbnailUrl,
           category: ch.category,
           active: ch.active,
         })
@@ -44,6 +57,7 @@ async function main() {
       handle: ch.handle,
       youtubeChannelId: ch.youtubeChannelId,
       name: ch.name,
+      thumbnailUrl: stats?.thumbnailUrl ?? null,
       category: ch.category,
       active: ch.active,
     });

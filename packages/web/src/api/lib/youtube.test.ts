@@ -5,6 +5,7 @@ import {
   chunkArray,
   fetchChannelsByIdsSafe,
   isSuccessfulCollectionRate,
+  selectChannelThumbnailUrl,
   withYoutubeRetry,
   YoutubeApiError,
 } from "./youtube";
@@ -62,6 +63,21 @@ describe("YouTube collection helpers", () => {
   test("uses 95 percent success threshold", () => {
     expect(isSuccessfulCollectionRate(95, 100)).toBe(true);
     expect(isSuccessfulCollectionRate(94, 100)).toBe(false);
+  });
+
+  test("selects channel thumbnails in high medium default order", () => {
+    expect(
+      selectChannelThumbnailUrl({
+        default: { url: "default.jpg" },
+        medium: { url: "medium.jpg" },
+        high: { url: "high.jpg" },
+      }),
+    ).toBe("high.jpg");
+    expect(selectChannelThumbnailUrl({ default: { url: "default.jpg" }, medium: { url: "medium.jpg" } })).toBe(
+      "medium.jpg",
+    );
+    expect(selectChannelThumbnailUrl({ default: { url: "default.jpg" } })).toBe("default.jpg");
+    expect(selectChannelThumbnailUrl(undefined)).toBeNull();
   });
 
   test("prevents duplicate snapshots for the same day", () => {

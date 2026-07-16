@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Search, Users } from "lucide-react";
+import { Search } from "lucide-react";
+import { ChannelAvatar } from "../components/channel-avatar";
 import { api } from "../lib/api";
 import { formatJapaneseCount } from "../lib/format";
 
@@ -62,13 +63,7 @@ function ChannelsPage() {
         <div className="grid gap-2">
           {list.map((channel) => (
             <Link key={channel.id} to={`/channels/${channel.id}`} className="interactive-card rounded-xl border px-4 py-3 flex items-center gap-3">
-              {channel.thumbnailUrl ? (
-                <img src={channel.thumbnailUrl} alt={channel.name} className="size-11 rounded-full object-cover border border-border/80" />
-              ) : (
-                <div className="size-11 rounded-full bg-secondary border border-border/80 flex items-center justify-center">
-                  <Users className="size-5 text-muted-foreground" />
-                </div>
-              )}
+              <ChannelAvatar name={channel.name} thumbnailUrl={channel.thumbnailUrl} className="size-11 rounded-full" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold truncate">{channel.name}</p>
                 <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[channel.category] ?? "その他"}</p>
