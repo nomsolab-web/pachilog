@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Users, Eye } from "lucide-react";
+import { ArrowLeft, Eye, Users } from "lucide-react";
 import { api } from "../lib/api";
+import { formatJapaneseCount } from "../lib/format";
 import { ChannelChart } from "../components/channel-chart";
 import { VoteWidget } from "../components/vote-widget";
 import { ShareButton } from "../components/share-button";
@@ -57,14 +58,14 @@ function ChannelPage() {
             <Users className="size-3.5" />
             登録者数
           </p>
-          <p className="font-display font-bold text-2xl">{latest ? latest.subscriberCount.toLocaleString() : "-"}</p>
+          <p className="font-display font-bold text-2xl">{formatJapaneseCount(latest?.subscriberCount, "人")}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
             <Eye className="size-3.5" />
             総再生数
           </p>
-          <p className="font-display font-bold text-2xl">{latest ? latest.viewCount.toLocaleString() : "-"}</p>
+          <p className="font-display font-bold text-2xl">{latest ? latest.viewCount.toLocaleString("ja-JP") : "-"}</p>
         </div>
       </div>
 
@@ -93,7 +94,7 @@ function ChannelPage() {
       <div className="grid sm:grid-cols-2 gap-4 mb-6">
         <VoteWidget channelId={channel.id} />
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-sm font-medium mb-3">この結果をシェアしよう</p>
+          <p className="text-sm font-medium mb-3">この結果をシェア</p>
           <ShareButton name={channel.name} subscriberCount={latest?.subscriberCount ?? 0} deltaPct={deltaPct} />
         </div>
       </div>

@@ -5,9 +5,12 @@ import MachinesPage from "./pages/machines";
 import MachinePage from "./pages/machine";
 import WeeklyPage from "./pages/weekly";
 import WeeklyDetailPage from "./pages/weekly-detail";
+import AboutPage from "./pages/about";
+import MethodologyPage from "./pages/methodology";
+import PrivacyPage from "./pages/privacy";
+import ContactPage from "./pages/contact";
 import { Layout } from "./components/layout";
 import { Provider } from "./components/provider";
-import { AgentFeedback, RunableBadge } from "@runablehq/website-runtime";
 
 function App() {
   return (
@@ -20,10 +23,12 @@ function App() {
           <Route path="/machines/:id" component={MachinePage} />
           <Route path="/weekly" component={WeeklyPage} />
           <Route path="/weekly/:weekOf" component={WeeklyDetailPage} />
+          <Route path="/about" component={AboutPage} />
+          <Route path="/methodology" component={MethodologyPage} />
+          <Route path="/privacy" component={PrivacyPage} />
+          <Route path="/contact" component={ContactPage} />
         </Switch>
       </Layout>
-      {import.meta.env.DEV && <AgentFeedback />}
-      {<RunableBadge />}
     </Provider>
   );
 }

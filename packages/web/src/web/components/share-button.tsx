@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Download, Share2 } from "lucide-react";
+import { formatJapaneseCount } from "../lib/format";
 
 type Props = {
   name: string;
@@ -26,7 +27,7 @@ async function drawShareImage(canvas: HTMLCanvasElement, { name, subscriberCount
   ctx.fillText("パチログ", 48, 72);
   ctx.fillStyle = "#8b96a8";
   ctx.font = "400 18px sans-serif";
-  ctx.fillText("パチスロ系YouTuber 推移トラッカー", 48, 104);
+  ctx.fillText("パチンコパチスロ系YouTuber 推移トラッカー", 48, 104);
 
   ctx.fillStyle = "#f2f5f9";
   ctx.font = "700 44px sans-serif";
@@ -34,7 +35,7 @@ async function drawShareImage(canvas: HTMLCanvasElement, { name, subscriberCount
 
   ctx.font = "800 72px sans-serif";
   ctx.fillStyle = "#f2f5f9";
-  ctx.fillText(`${subscriberCount.toLocaleString()}人`, 48, 320);
+  ctx.fillText(formatJapaneseCount(subscriberCount, "人"), 48, 320);
 
   const rising = deltaPct >= 0;
   ctx.fillStyle = rising ? "#34f5a3" : "#ff5c7a";
@@ -61,7 +62,7 @@ export function ShareButton({ name, subscriberCount, deltaPct }: Props) {
 
   const handleShareX = () => {
     const rising = deltaPct >= 0;
-    const text = `${name} のチャンネル登録者数は現在${subscriberCount.toLocaleString()}人！(${rising ? "▲" : "▼"}${Math.abs(deltaPct).toFixed(1)}%)\n#パチログ で推移をチェック`;
+    const text = `${name} のチャンネル登録者数は現在${formatJapaneseCount(subscriberCount, "人")}！(${rising ? "▲" : "▼"}${Math.abs(deltaPct).toFixed(1)}%)\n#パチログ で推移をチェック`;
     const url = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };

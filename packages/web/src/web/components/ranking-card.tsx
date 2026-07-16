@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { ArrowDown, ArrowUp, Users } from "lucide-react";
+import { formatJapaneseCount } from "../lib/format";
 
 type Props = {
   rank: number;
@@ -9,10 +10,17 @@ type Props = {
   latestSubscriberCount: number;
   delta: number;
   deltaPct: number;
+  snapshotCount: number;
 };
 
-export function RankingCard({ rank, id, name, thumbnailUrl, latestSubscriberCount, delta, deltaPct }: Props) {
+export function RankingCard({ rank, id, name, thumbnailUrl, latestSubscriberCount, delta, deltaPct, snapshotCount }: Props) {
+  const hasTrend = snapshotCount > 1;
   const rising = delta >= 0;
+  const trendClass = hasTrend
+    ? rising
+      ? "text-rise bg-rise/10"
+      : "text-fall bg-fall/10"
+    : "text-muted-foreground bg-secondary";
   return (
     <Link
       to={`/channels/${id}`}
@@ -30,16 +38,20 @@ export function RankingCard({ rank, id, name, thumbnailUrl, latestSubscriberCoun
         <p className="font-medium truncate">{name}</p>
         <p className="text-xs text-muted-foreground font-display flex items-center gap-1">
           <Users className="size-3" />
-          {latestSubscriberCount.toLocaleString()}人
+          {formatJapaneseCount(latestSubscriberCount, "人")}
         </p>
       </div>
       <div
-        className={`flex items-center gap-1 font-display font-semibold text-sm px-2 py-1 rounded-lg ${
-          rising ? "text-rise bg-rise/10" : "text-fall bg-fall/10"
-        }`}
+        className={`flex shrink-0 items-center gap-1 font-display font-semibold text-sm px-2 py-1 rounded-lg ${trendClass}`}
       >
-        {rising ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />}
-        {Math.abs(deltaPct).toFixed(1)}%
+        {hasTrend ? (
+          <>
+            {rising ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />}
+            {Math.abs(deltaPct).toFixed(1)}%
+          </>
+        ) : (
+          "データ蓄積中"
+        )}
       </div>
     </Link>
   );

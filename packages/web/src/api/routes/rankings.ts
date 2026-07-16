@@ -32,6 +32,7 @@ export const rankings = new Hono().get("/", async (c) => {
         thumbnailUrl: channel.thumbnailUrl,
         latestSubscriberCount: latest.subscriberCount,
         latestDate: latest.date,
+        snapshotCount: snapshots.length,
         delta,
         deltaPct: Number(deltaPct.toFixed(2)),
       };

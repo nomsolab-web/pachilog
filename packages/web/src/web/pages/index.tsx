@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarDays, TrendingDown, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
+import { formatJapaneseDate } from "../lib/format";
 import { RankingCard } from "../components/ranking-card";
 
 const PERIODS = [
@@ -20,16 +22,30 @@ function Index() {
   });
 
   const list = rankings.data ? (tab === "rising" ? rankings.data.rising : rankings.data.falling) : [];
+  const latestDate = useMemo(() => {
+    if (!rankings.data) return null;
+    const all = [...rankings.data.rising, ...rankings.data.falling].map((entry) => entry.latestDate).filter(Boolean);
+    return all.sort().at(-1) ?? null;
+  }, [rankings.data]);
 
   return (
     <div>
       <section className="mb-10">
-        <h1 className="font-display font-extrabold text-3xl mb-2">
-          パチスロ系YouTuber、<span className="text-gold">今</span>伸びてるのは？
+        <h1 className="font-display font-extrabold text-3xl mb-3">
+          パチンコパチスロ系YouTuber、今伸びてるのは？
         </h1>
-        <p className="text-muted-foreground">
-          チャンネル登録者数・再生数の推移を毎日自動収集。攻略・期待値は扱いません。
+        <p className="text-muted-foreground max-w-3xl">
+          チャンネル登録者数と再生数の推移を毎日自動で集計し、直近の伸びをランキング化しています。期待値や攻略情報ではなく、公開データの変化だけを扱います。
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarDays className="size-4" />
+            最終更新日: {formatJapaneseDate(latestDate)}
+          </span>
+          <Link to="/methodology" className="text-gold hover:text-gold/80 transition-colors">
+            ランキングの集計方法
+          </Link>
+        </div>
       </section>
 
       <section>
@@ -51,7 +67,7 @@ function Index() {
               }`}
             >
               <TrendingDown className="size-4" />
-              急降下
+              急下降
             </button>
           </div>
 
@@ -78,7 +94,7 @@ function Index() {
           </div>
         ) : list.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl">
-            まだデータが十分に溜まっていません。収集が進むとここにランキングが表示されます。
+            まだランキングに必要なデータがありません。収集が進むとここに表示されます。
           </div>
         ) : (
           <div className="space-y-2">
@@ -92,6 +108,7 @@ function Index() {
                 latestSubscriberCount={entry.latestSubscriberCount}
                 delta={entry.delta}
                 deltaPct={entry.deltaPct}
+                snapshotCount={entry.snapshotCount}
               />
             ))}
           </div>
