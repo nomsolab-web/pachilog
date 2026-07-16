@@ -20,7 +20,7 @@ jobs:
   collect:
     environment: pachilog_secret
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
@@ -73,8 +73,10 @@ jobs:
           echo "Channel collection: ${channel_result}"
           CHANNEL_RESULT="${channel_result}" bun -e '
             const result = JSON.parse(process.env.CHANNEL_RESULT ?? "{}");
-            if (result.channelsRequested < 1 || result.channelsFetched !== result.channelsRequested) {
-              console.error("Channel collection was incomplete.");
+            const requested = result.channelsRequested ?? 0;
+            const fetched = result.channelsFetched ?? 0;
+            if (requested < 1 || fetched / requested < 0.95) {
+              console.error("Channel collection was incomplete.", result.errors ?? []);
               process.exit(1);
             }
           '
@@ -86,8 +88,10 @@ jobs:
           echo "Machine collection: ${machine_result}"
           MACHINE_RESULT="${machine_result}" bun -e '
             const result = JSON.parse(process.env.MACHINE_RESULT ?? "{}");
-            if (result.channelsScanned < 1 || result.errors?.length > 0) {
-              console.error("Machine collection was incomplete.");
+            const requested = result.channelsRequested ?? 0;
+            const failed = result.failedChannels ?? 0;
+            if (requested < 1 || (requested - failed) / requested < 0.95) {
+              console.error("Machine collection was incomplete.", result.errors ?? []);
               process.exit(1);
             }
           '

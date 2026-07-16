@@ -11,7 +11,9 @@ export const channels = sqliteTable("channels", {
   handle: text("handle"),
   name: text("name").notNull(),
   thumbnailUrl: text("thumbnail_url"),
-  category: text("category").notNull().default("pachislo"),
+  category: text("category", { enum: ["media", "performer", "individual", "manufacturer", "hall", "other"] })
+    .notNull()
+    .default("other"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()

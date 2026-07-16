@@ -2,8 +2,14 @@ import { Hono } from "hono";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../database";
 import { channels, channelSnapshots } from "../database/schema";
+import { shouldInsertSnapshot } from "../lib/collection";
 import { dateStringInTimeZone } from "../lib/date";
-import { fetchChannelByHandle, fetchChannelsByIds } from "../lib/youtube";
+import {
+  fetchChannelByHandle,
+  fetchChannelsByIdsSafe,
+  isSuccessfulCollectionRate,
+  mapWithConcurrency,
+} from "../lib/youtube";
 
 export const collect = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -19,6 +25,7 @@ export const collect = new Hono().post("/run", async (c) => {
     channelsFetched: 0,
     snapshotsInserted: 0,
     skippedExisting: 0,
+    failedChannels: 0,
     errors: [] as string[],
   };
 
@@ -27,8 +34,8 @@ export const collect = new Hono().post("/run", async (c) => {
     .select()
     .from(channels)
     .where(and(isNull(channels.youtubeChannelId), eq(channels.active, true)));
-  for (const ch of unresolved) {
-    if (!ch.handle) continue;
+  await mapWithConcurrency(unresolved, 5, async (ch) => {
+    if (!ch.handle) return;
     try {
       const stats = await fetchChannelByHandle(ch.handle);
       if (stats) {
@@ -43,11 +50,13 @@ export const collect = new Hono().post("/run", async (c) => {
         results.resolved += 1;
       } else {
         results.errors.push(`could not resolve handle ${ch.handle}`);
+        results.failedChannels += 1;
       }
     } catch (err) {
       results.errors.push(`${ch.handle}: ${(err as Error).message}`);
+      results.failedChannels += 1;
     }
-  }
+  });
 
   // 2. Fetch stats for all channels that now have a resolved youtube_channel_id
   const active = await db
@@ -60,13 +69,16 @@ export const collect = new Hono().post("/run", async (c) => {
   const idToChannel = new Map(withIds.map((ch) => [ch.youtubeChannelId as string, ch]));
 
   if (withIds.length > 0) {
-    const stats = await fetchChannelsByIds(withIds.map((ch) => ch.youtubeChannelId as string));
+    const batchResult = await fetchChannelsByIdsSafe(withIds.map((ch) => ch.youtubeChannelId as string));
+    const stats = batchResult.items;
+    results.errors.push(...batchResult.errors);
     results.channelsFetched = stats.length;
 
     const fetchedIds = new Set(stats.map((item) => item.channelId));
     for (const ch of withIds) {
       if (ch.youtubeChannelId && !fetchedIds.has(ch.youtubeChannelId)) {
         results.errors.push(`${ch.name}: channel statistics were not returned by YouTube`);
+        results.failedChannels += 1;
       }
     }
 
@@ -79,7 +91,7 @@ export const collect = new Hono().post("/run", async (c) => {
         .from(channelSnapshots)
         .where(and(eq(channelSnapshots.channelId, ch.id), eq(channelSnapshots.date, date)));
 
-      if (existing.length > 0) {
+      if (!shouldInsertSnapshot(existing.map((row) => row.date), date)) {
         results.skippedExisting += 1;
         continue;
       }
@@ -95,5 +107,6 @@ export const collect = new Hono().post("/run", async (c) => {
     }
   }
 
-  return c.json(results, 200);
+  const ok = isSuccessfulCollectionRate(results.channelsFetched, results.channelsRequested);
+  return c.json(results, ok ? 200 : 502);
 });

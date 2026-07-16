@@ -1,5 +1,6 @@
 import { Route, Switch } from "wouter";
 import Index from "./pages/index";
+import ChannelsPage from "./pages/channels";
 import ChannelPage from "./pages/channel";
 import MachinesPage from "./pages/machines";
 import MachinePage from "./pages/machine";
@@ -18,6 +19,7 @@ function App() {
       <Layout>
         <Switch>
           <Route path="/" component={Index} />
+          <Route path="/channels" component={ChannelsPage} />
           <Route path="/channels/:id" component={ChannelPage} />
           <Route path="/machines" component={MachinesPage} />
           <Route path="/machines/:id" component={MachinePage} />

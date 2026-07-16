@@ -20,6 +20,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
               チャンネル推移
             </Link>
+            <Link to="/channels" className="text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
+              全チャンネル
+            </Link>
             <Link to="/machines" className="text-muted-foreground hover:text-foreground transition-colors px-1 py-1">
               新台バズ
             </Link>

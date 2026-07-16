@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, TrendingDown, TrendingUp } from "lucide-react";
+import { CalendarDays, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { formatJapaneseDate } from "../lib/format";
 import { RankingCard } from "../components/ranking-card";
@@ -12,9 +12,21 @@ const PERIODS = [
   { label: "90日", value: 90 },
 ] as const;
 
+const CATEGORY_OPTIONS = [
+  { label: "すべて", value: "all" },
+  { label: "媒体", value: "media" },
+  { label: "演者", value: "performer" },
+  { label: "個人", value: "individual" },
+  { label: "メーカー", value: "manufacturer" },
+  { label: "ホール", value: "hall" },
+  { label: "その他", value: "other" },
+] as const;
+
 function Index() {
   const [period, setPeriod] = useState<7 | 30 | 90>(7);
   const [tab, setTab] = useState<"rising" | "falling">("rising");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]["value"]>("all");
 
   const rankings = useQuery({
     queryKey: ["rankings", period],
@@ -22,6 +34,10 @@ function Index() {
   });
 
   const list = rankings.data ? (tab === "rising" ? rankings.data.rising : rankings.data.falling) : [];
+  const visibleList = list
+    .filter((entry) => (category === "all" ? true : entry.category === category))
+    .filter((entry) => entry.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 50);
   const latestDate = useMemo(() => {
     if (!rankings.data) return null;
     const all = [...rankings.data.rising, ...rankings.data.falling].map((entry) => entry.latestDate).filter(Boolean);
@@ -44,6 +60,9 @@ function Index() {
           </span>
           <Link to="/methodology" className="text-gold hover:text-gold/80 transition-colors">
             ランキングの集計方法
+          </Link>
+          <Link to="/channels" className="text-info hover:text-info/80 transition-colors">
+            全チャンネル一覧
           </Link>
         </div>
       </section>
@@ -86,19 +105,45 @@ function Index() {
           </div>
         </div>
 
+        <div className="grid gap-3 mb-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="flex items-center gap-2 rounded-xl border surface-card px-3 py-2">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="チャンネル名で検索"
+              aria-label="チャンネル名で検索"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </label>
+          <div className="segmented-control flex gap-1 rounded-lg border p-1 overflow-x-auto">
+            {CATEGORY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setCategory(option.value)}
+                className={`segmented-button shrink-0 px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  category === option.value ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {rankings.isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-[68px] rounded-xl border surface-card animate-pulse" />
             ))}
           </div>
-        ) : list.length === 0 ? (
+        ) : visibleList.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl surface-card">
             まだランキングに必要なデータがありません。収集が進むとここに表示されます。
           </div>
         ) : (
           <div className="space-y-2">
-            {list.map((entry, i) => (
+            {visibleList.map((entry, i) => (
               <RankingCard
                 key={entry.id}
                 rank={i + 1}

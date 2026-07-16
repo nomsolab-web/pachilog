@@ -2,7 +2,13 @@ import { Hono } from "hono";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machineMentions, machines } from "../database/schema";
-import { fetchRecentVideos, fetchUploadsPlaylistId, fetchVideoStats } from "../lib/youtube";
+import {
+  fetchRecentVideos,
+  fetchUploadsPlaylistId,
+  fetchVideoStats,
+  isSuccessfulCollectionRate,
+  mapWithConcurrency,
+} from "../lib/youtube";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -10,7 +16,15 @@ export const collectMachines = new Hono().post("/run", async (c) => {
     return c.json({ error: "unauthorized" }, 401);
   }
 
-  const results = { channelsScanned: 0, mentionsUpserted: 0, errors: [] as string[] };
+  const results = {
+    channelsRequested: 0,
+    channelsScanned: 0,
+    skippedNoPlaylist: 0,
+    skippedNoVideos: 0,
+    mentionsUpserted: 0,
+    failedChannels: 0,
+    errors: [] as string[],
+  };
 
   const machineList = await db.select().from(machines);
   if (machineList.length === 0) {
@@ -21,14 +35,21 @@ export const collectMachines = new Hono().post("/run", async (c) => {
     .select()
     .from(channels)
     .where(and(eq(channels.active, true), isNotNull(channels.youtubeChannelId)));
+  results.channelsRequested = activeChannels.length;
 
-  for (const ch of activeChannels) {
+  await mapWithConcurrency(activeChannels, 5, async (ch) => {
     try {
       const playlistId = await fetchUploadsPlaylistId(ch.youtubeChannelId as string);
-      if (!playlistId) continue;
+      if (!playlistId) {
+        results.skippedNoPlaylist += 1;
+        return;
+      }
 
       const videos = await fetchRecentVideos(playlistId, 25);
-      if (videos.length === 0) continue;
+      if (videos.length === 0) {
+        results.skippedNoVideos += 1;
+        return;
+      }
 
       // find which recent videos mention a tracked machine name in their title
       const matches = videos
@@ -37,7 +58,7 @@ export const collectMachines = new Hono().post("/run", async (c) => {
 
       if (matches.length === 0) {
         results.channelsScanned += 1;
-        continue;
+        return;
       }
 
       const stats = await fetchVideoStats(matches.map((x) => x.video.videoId));
@@ -79,9 +100,11 @@ export const collectMachines = new Hono().post("/run", async (c) => {
 
       results.channelsScanned += 1;
     } catch (err) {
+      results.failedChannels += 1;
       results.errors.push(`${ch.name}: ${(err as Error).message}`);
     }
-  }
+  });
 
-  return c.json(results, 200);
+  const ok = isSuccessfulCollectionRate(results.channelsRequested - results.failedChannels, results.channelsRequested);
+  return c.json(results, ok ? 200 : 502);
 });
