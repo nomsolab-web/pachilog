@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Search } from "lucide-react";
+import { Search, Youtube } from "lucide-react";
 import { ChannelAvatar } from "../components/channel-avatar";
 import { api } from "../lib/api";
 import { formatJapaneseCount } from "../lib/format";
+import { getYouTubeChannelUrl } from "../lib/youtube";
 
 const CATEGORY_LABELS: Record<string, string> = {
   media: "媒体",
@@ -61,18 +62,34 @@ function ChannelsPage() {
         </div>
       ) : (
         <div className="grid gap-2">
-          {list.map((channel) => (
-            <Link key={channel.id} to={`/channels/${channel.id}`} className="interactive-card rounded-xl border px-4 py-3 flex items-center gap-3">
-              <ChannelAvatar name={channel.name} thumbnailUrl={channel.thumbnailUrl} className="size-11 rounded-full" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold truncate">{channel.name}</p>
-                <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[channel.category] ?? "その他"}</p>
+          {list.map((channel) => {
+            const youtubeUrl = getYouTubeChannelUrl(channel);
+            return (
+              <div key={channel.id} className="interactive-card rounded-xl border px-4 py-3 flex items-center gap-3">
+                <Link to={`/channels/${channel.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <ChannelAvatar name={channel.name} thumbnailUrl={channel.thumbnailUrl} className="size-11 rounded-full" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold truncate">{channel.name}</p>
+                    <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[channel.category] ?? "その他"}</p>
+                  </div>
+                </Link>
+                <p className="font-display font-bold text-sm text-info shrink-0">
+                  {formatJapaneseCount(channel.latestSubscriberCount, "人")}
+                </p>
+                {youtubeUrl && (
+                  <a
+                    href={youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${channel.name} をYouTubeで開く`}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/80 text-muted-foreground hover:border-gold/60 hover:text-gold"
+                  >
+                    <Youtube className="size-4" />
+                  </a>
+                )}
               </div>
-              <p className="font-display font-bold text-sm text-info shrink-0">
-                {formatJapaneseCount(channel.latestSubscriberCount, "人")}
-              </p>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

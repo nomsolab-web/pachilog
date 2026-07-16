@@ -149,6 +149,8 @@ function Index() {
                 rank={i + 1}
                 id={entry.id}
                 name={entry.name}
+                handle={entry.handle}
+                youtubeChannelId={entry.youtubeChannelId}
                 thumbnailUrl={entry.thumbnailUrl}
                 latestSubscriberCount={entry.latestSubscriberCount}
                 delta={entry.delta}

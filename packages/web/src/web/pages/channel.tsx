@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Eye, Users } from "lucide-react";
+import { ArrowLeft, Eye, Users, Youtube } from "lucide-react";
 import { api } from "../lib/api";
 import { formatJapaneseCount } from "../lib/format";
+import { getYouTubeChannelUrl } from "../lib/youtube";
 import { ChannelChart } from "../components/channel-chart";
 import { ChannelAvatar } from "../components/channel-avatar";
 import { VoteWidget } from "../components/vote-widget";
@@ -27,6 +28,7 @@ function ChannelPage() {
   }
 
   const { channel, snapshots } = detail.data;
+  const youtubeUrl = getYouTubeChannelUrl(channel);
   const latest = snapshots[snapshots.length - 1];
   const prev = snapshots.length > 1 ? snapshots[0] : null;
   const deltaPct =
@@ -46,6 +48,17 @@ function ChannelPage() {
         <div>
           <h1 className="font-display font-bold text-2xl">{channel.name}</h1>
           {channel.handle && <p className="text-sm text-muted-foreground">{channel.handle}</p>}
+          {youtubeUrl && (
+            <a
+              href={youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gold/40 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-gold/10"
+            >
+              <Youtube className="size-4" />
+              YouTubeで開く
+            </a>
+          )}
         </div>
       </div>
 
