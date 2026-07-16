@@ -11,6 +11,7 @@ const INDEX_CACHE = "no-cache";
 
 const server = Bun.serve({
   port,
+  idleTimeout: 255,
   async fetch(request) {
     const url = new URL(request.url);
 
