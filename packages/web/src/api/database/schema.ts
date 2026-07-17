@@ -55,6 +55,7 @@ export const machines = sqliteTable("machines", {
   name: text("name").notNull(),
   shortName: text("short_name"),
   aliases: text("aliases", { mode: "json" }).$type<string[]>(),
+  excludeTerms: text("exclude_terms", { mode: "json" }).$type<string[]>(),
   type: text("type"),
   maker: text("maker"),
   releaseDate: text("release_date"),
@@ -86,6 +87,33 @@ export const machineMentions = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [uniqueIndex("machine_video_idx").on(table.machineId, table.videoId)],
+);
+
+export const machineVideoJudgments = sqliteTable(
+  "machine_video_judgments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    judgmentKey: text("judgment_key").notNull().unique(),
+    machineId: integer("machine_id").references(() => machines.id, { onDelete: "cascade" }),
+    channelId: integer("channel_id").references(() => channels.id, { onDelete: "set null" }),
+    videoId: text("video_id").notNull(),
+    videoTitle: text("video_title").notNull(),
+    channelName: text("channel_name"),
+    publishedAt: text("published_at"),
+    source: text("source", { enum: ["gemini"] }).notNull().default("gemini"),
+    status: text("status", { enum: ["auto_linked", "pending", "rejected", "error"] }).notNull(),
+    confidence: integer("confidence").notNull().default(0),
+    reason: text("reason"),
+    matchedTerms: text("matched_terms", { mode: "json" }).$type<string[]>(),
+    rawResponse: text("raw_response"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [uniqueIndex("machine_video_judgment_key_idx").on(table.judgmentKey)],
 );
 
 export const machineVotes = sqliteTable("machine_votes", {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { findMachineMatches, machineTerms } from "./machine-match";
+import { findAmbiguousMachineCandidates, findMachineMatches, machineTerms } from "./machine-match";
 
 const machines = [
   { id: 1, name: "スマスロ北斗の拳", shortName: "北斗", aliases: ["北斗の拳", "スマスロ北斗"] },
@@ -22,5 +22,11 @@ describe("machine title matching", () => {
       1,
       2,
     ]);
+  });
+
+  test("respects exclude terms and finds ambiguous candidates separately", () => {
+    const machineList = [{ id: 3, name: "P海物語 極JAPAN", shortName: "海", aliases: [], excludeTerms: ["釣り"] }];
+    expect(findMachineMatches("釣りで海物語", machineList)).toEqual([]);
+    expect(findAmbiguousMachineCandidates("極JAPANを試す", machineList).map((machine) => machine.id)).toEqual([3]);
   });
 });

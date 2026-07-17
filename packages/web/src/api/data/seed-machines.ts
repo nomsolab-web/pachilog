@@ -10,6 +10,7 @@ export type SeedMachine = {
   type?: string;
   shortName?: string;
   aliases?: string[];
+  excludeTerms?: string[];
 };
 
 export const SEED_MACHINES: SeedMachine[] = [

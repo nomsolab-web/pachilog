@@ -10,6 +10,7 @@ import {
   mapWithConcurrency,
 } from "../lib/youtube";
 import { findMachineMatches } from "../lib/machine-match";
+import { buildAiCandidates, runAiMachineJudgments, type AiCandidate } from "../lib/machine-ai";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -24,8 +25,10 @@ export const collectMachines = new Hono().post("/run", async (c) => {
     skippedNoVideos: 0,
     mentionsUpserted: 0,
     failedChannels: 0,
+    ai: null as Awaited<ReturnType<typeof runAiMachineJudgments>> | null,
     errors: [] as string[],
   };
+  const aiCandidates: AiCandidate[] = [];
 
   const machineList = await db.select().from(machines);
   if (machineList.length === 0) {
@@ -55,6 +58,8 @@ export const collectMachines = new Hono().post("/run", async (c) => {
       const matches = videos.flatMap((video) =>
         findMachineMatches(video.title, machineList).map((machine) => ({ video, machine })),
       );
+      const matchedVideoIds = new Set(matches.map((match) => match.video.videoId));
+      aiCandidates.push(...buildAiCandidates(videos.filter((video) => !matchedVideoIds.has(video.videoId)), ch, machineList));
 
       if (matches.length === 0) {
         results.channelsScanned += 1;
@@ -103,6 +108,17 @@ export const collectMachines = new Hono().post("/run", async (c) => {
       results.failedChannels += 1;
       results.errors.push(`${ch.name}: ${(err as Error).message}`);
     }
+  });
+
+  results.ai = await runAiMachineJudgments(aiCandidates);
+  console.log("Machine AI judgment summary", {
+    skipped: results.ai.skipped,
+    callsUsed: results.ai.callsUsed,
+    candidates: results.ai.candidates,
+    autoLinked: results.ai.autoLinked,
+    pending: results.ai.pending,
+    rejected: results.ai.rejected,
+    failed: results.ai.failed,
   });
 
   const ok = isSuccessfulCollectionRate(results.channelsRequested - results.failedChannels, results.channelsRequested);

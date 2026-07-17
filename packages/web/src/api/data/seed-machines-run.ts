@@ -18,6 +18,7 @@ async function main() {
       type: m.type,
       shortName: m.shortName,
       aliases: m.aliases,
+      excludeTerms: m.excludeTerms,
     };
     if (existing.length > 0) {
       await db.update(machines).set(values).where(eq(machines.id, existing[0].id));
