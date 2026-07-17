@@ -24,10 +24,11 @@ async function drawShareImage(canvas: HTMLCanvasElement, { name, subscriberCount
 
   ctx.fillStyle = "#ffc857";
   ctx.font = "700 32px sans-serif";
-  ctx.fillText("パチログ", 48, 72);
+  ctx.fillText("パチパルス！", 48, 72);
   ctx.fillStyle = "#8b96a8";
   ctx.font = "400 18px sans-serif";
-  ctx.fillText("パチンコパチスロ系YouTuber 推移トラッカー", 48, 104);
+  ctx.fillText("PachiPulse", 48, 104);
+  ctx.fillText("パチンコパチスロの「今」をデータで追う。", 48, 128);
 
   ctx.fillStyle = "#f2f5f9";
   ctx.font = "700 44px sans-serif";
@@ -44,7 +45,7 @@ async function drawShareImage(canvas: HTMLCanvasElement, { name, subscriberCount
 
   ctx.fillStyle = "#8b96a8";
   ctx.font = "400 18px sans-serif";
-  ctx.fillText("pachilog.jp で毎日の推移をチェック", 48, 500);
+  ctx.fillText("パチパルス！で毎日の推移をチェック", 48, 500);
 }
 
 export function ShareButton({ name, subscriberCount, deltaPct }: Props) {
@@ -55,21 +56,21 @@ export function ShareButton({ name, subscriberCount, deltaPct }: Props) {
     if (!canvas) return;
     await drawShareImage(canvas, { name, subscriberCount, deltaPct });
     const link = document.createElement("a");
-    link.download = `pachilog-${name}.png`;
+    link.download = `pachitrend-${name}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
   };
 
   const handleShareX = () => {
     const rising = deltaPct >= 0;
-    const text = `${name} のチャンネル登録者数は現在${formatJapaneseCount(subscriberCount, "人")}！(${rising ? "▲" : "▼"}${Math.abs(deltaPct).toFixed(1)}%)\n#パチログ で推移をチェック`;
+    const text = `${name} のチャンネル登録者数は現在${formatJapaneseCount(subscriberCount, "人")}！(${rising ? "▲" : "▼"}${Math.abs(deltaPct).toFixed(1)}%)\n#パチパルス で推移をチェック`;
     const url = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
   return (
     <div className="flex gap-2">
-      <canvas ref={canvasRef} className="hidden" aria-label="シェア画像生成用キャンバス" />
+      <canvas ref={canvasRef} className="hidden" aria-label="パチパルス！ シェア画像生成用キャンバス" />
       <button
         onClick={handleDownload}
         className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm font-medium hover:bg-secondary transition-colors"

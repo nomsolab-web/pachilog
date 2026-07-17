@@ -53,10 +53,10 @@ function Index() {
     <div>
       <section className="site-hero rounded-2xl px-5 py-6 mb-10 sm:px-7 sm:py-8">
         <h1 className="font-display font-extrabold text-3xl sm:text-4xl mb-3">
-          パチンコパチスロ系YouTuber、今伸びてるのは？
+          パチンコパチスロの「今」をデータで追う。
         </h1>
         <p className="text-muted-foreground max-w-3xl leading-7">
-          チャンネル登録者数と再生数の推移を毎日自動で集計し、直近の伸びをランキング化しています。期待値や攻略情報ではなく、公開データの変化だけを扱います。
+          パチンコパチスロ系YouTube動画、チャンネル、新台の伸びを毎日集計するデータメディアです。公開データの変化だけを見やすく整理し、今注目されている動きを追えます。
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">

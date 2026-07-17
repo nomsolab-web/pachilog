@@ -7,13 +7,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col">
       <header className="site-header border-b border-border/80 sticky top-0 z-10 backdrop-blur-xl">
         <div className="max-w-[1200px] mx-auto px-4 py-3 sm:py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Link to="/" className="brand-logo flex items-center gap-3 font-display font-extrabold text-xl shrink-0">
-            <span className="brand-mark size-9 rounded-xl flex items-center justify-center">
-              <TrendingUp className="size-5 text-primary-foreground" strokeWidth={2.8} />
+          <Link to="/" aria-label="パチパルス！ ホーム" className="brand-logo flex items-center gap-3 font-display font-extrabold text-xl shrink-0">
+            <span className="brand-mark size-10 rounded-2xl flex items-center justify-center">
+              <TrendingUp className="size-6 text-primary-foreground" strokeWidth={2.8} />
             </span>
-            <span className="leading-none">
+            <span className="leading-none tracking-tight">
               <span className="text-foreground">パチ</span>
-              <span className="text-gold">ログ</span>
+              <span className="text-gold">パルス！</span>
             </span>
           </Link>
           <nav className="text-sm flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 sm:gap-5 sm:overflow-visible sm:pb-0">
@@ -39,11 +39,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <footer className="site-footer border-t border-border/80">
         <div className="max-w-[1200px] mx-auto px-4 py-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            パチログは公開データをもとに、パチンコ・パチスロ系YouTubeチャンネルの推移を整理するサイトです。
+            パチパルス！は、動画チャンネル新台の伸びを毎日集計するデータメディアです。
           </p>
           <nav className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
             <Link to="/about" className="hover:text-foreground transition-colors">
-              パチログについて
+              パチパルス！について
             </Link>
             <Link to="/methodology" className="hover:text-foreground transition-colors">
               ランキングの集計方法

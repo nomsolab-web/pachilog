@@ -6,7 +6,7 @@ function PrivacyPage() {
         <section>
           <h2 className="font-display font-semibold text-lg text-foreground mb-2">取得する情報</h2>
           <p>
-            当サイトは、投票機能の重複防止や不正利用対策のため、ブラウザから生成される識別情報を利用する場合があります。
+            パチパルス！は、投票機能の重複防止や不正利用対策のため、ブラウザから生成される識別情報を利用する場合があります。
           </p>
         </section>
         <section>

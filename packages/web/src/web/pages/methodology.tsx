@@ -6,7 +6,7 @@ function MethodologyPage() {
         <section>
           <h2 className="font-display font-semibold text-lg text-foreground mb-2">チャンネルランキング</h2>
           <p>
-            登録対象チャンネルの公開されている登録者数を定期的に取得し、指定期間の最初のデータと最新データの差分で並べ替えています。
+            パチパルス！では、登録対象チャンネルの公開されている登録者数を定期的に取得し、指定期間の最初のデータと最新データの差分で並べ替えています。
           </p>
         </section>
         <section>
