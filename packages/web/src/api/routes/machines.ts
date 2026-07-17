@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machineMentions, machineVotes, machines } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
@@ -34,14 +34,43 @@ export const machinesRoute = new Hono()
         likeCount: machineMentions.likeCount,
         commentCount: machineMentions.commentCount,
         publishedAt: machineMentions.publishedAt,
+        updatedAt: machineMentions.updatedAt,
+        channelId: channels.id,
         channelName: channels.name,
+        channelThumbnailUrl: channels.thumbnailUrl,
       })
       .from(machineMentions)
       .innerJoin(channels, eq(machineMentions.channelId, channels.id))
       .where(eq(machineMentions.machineId, id))
       .orderBy(desc(machineMentions.viewCount));
 
-    return c.json({ machine, mentions }, 200);
+    const uniqueMentions = [...new Map(mentions.map((mention) => [mention.videoId, mention])).values()];
+    const oldest = await db
+      .select({ publishedAt: machineMentions.publishedAt })
+      .from(machineMentions)
+      .where(eq(machineMentions.machineId, id))
+      .orderBy(asc(machineMentions.publishedAt))
+      .limit(1);
+    const latest = await db
+      .select({ publishedAt: machineMentions.publishedAt })
+      .from(machineMentions)
+      .where(eq(machineMentions.machineId, id))
+      .orderBy(desc(machineMentions.publishedAt))
+      .limit(1);
+
+    return c.json(
+      {
+        machine,
+        mentions: uniqueMentions,
+        summary: {
+          videoCount: uniqueMentions.length,
+          totalViews: uniqueMentions.reduce((sum, mention) => sum + mention.viewCount, 0),
+          periodStart: oldest[0]?.publishedAt ?? null,
+          periodEnd: latest[0]?.publishedAt ?? null,
+        },
+      },
+      200,
+    );
   })
   .get("/:id/votes", async (c) => {
     const id = Number(c.req.param("id"));

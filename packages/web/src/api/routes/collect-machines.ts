@@ -9,6 +9,7 @@ import {
   isSuccessfulCollectionRate,
   mapWithConcurrency,
 } from "../lib/youtube";
+import { findMachineMatches } from "../lib/machine-match";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -51,17 +52,16 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         return;
       }
 
-      // find which recent videos mention a tracked machine name in their title
-      const matches = videos
-        .map((v) => ({ video: v, machine: machineList.find((m) => v.title.includes(m.name)) }))
-        .filter((x) => x.machine);
+      const matches = videos.flatMap((video) =>
+        findMachineMatches(video.title, machineList).map((machine) => ({ video, machine })),
+      );
 
       if (matches.length === 0) {
         results.channelsScanned += 1;
         return;
       }
 
-      const stats = await fetchVideoStats(matches.map((x) => x.video.videoId));
+      const stats = await fetchVideoStats([...new Set(matches.map((x) => x.video.videoId))]);
       const statsMap = new Map(stats.map((s) => [s.videoId, s]));
 
       for (const { video, machine } of matches) {

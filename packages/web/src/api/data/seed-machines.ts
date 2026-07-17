@@ -3,7 +3,16 @@
  * no strategy/expected-value data). Sourced from manufacturer/official release calendars.
  * Add new machines weekly by editing this list or inserting directly into the `machines` table.
  */
-export const SEED_MACHINES: { name: string; maker: string; releaseDate: string }[] = [
+export type SeedMachine = {
+  name: string;
+  maker: string;
+  releaseDate: string;
+  type?: string;
+  shortName?: string;
+  aliases?: string[];
+};
+
+export const SEED_MACHINES: SeedMachine[] = [
   { name: "Lパチスロ からくりサーカス2", maker: "SANKYO", releaseDate: "2026-07-06" },
   { name: "P/eフィーバーブルーロック Light ver.", maker: "SANKYO", releaseDate: "2026-07-06" },
   { name: "eフィーバー デッドマウント・デスプレイ 魂神", maker: "SANKYO", releaseDate: "2026-06-08" },

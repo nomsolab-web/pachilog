@@ -53,6 +53,9 @@ export const votes = sqliteTable("votes", {
 export const machines = sqliteTable("machines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  shortName: text("short_name"),
+  aliases: text("aliases", { mode: "json" }).$type<string[]>(),
+  type: text("type"),
   maker: text("maker"),
   releaseDate: text("release_date"),
   thumbnailUrl: text("thumbnail_url"),
