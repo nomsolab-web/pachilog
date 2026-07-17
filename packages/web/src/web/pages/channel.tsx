@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Eye, Users, Youtube } from "lucide-react";
@@ -7,17 +7,29 @@ import { formatJapaneseCount } from "../lib/format";
 import { getYouTubeChannelUrl } from "../lib/youtube";
 import { ChannelChart } from "../components/channel-chart";
 import { ChannelAvatar } from "../components/channel-avatar";
+import { VideoCard } from "../components/video-card";
 import { VoteWidget } from "../components/vote-widget";
 import { ShareButton } from "../components/share-button";
 
 function ChannelPage() {
   const { id } = useParams<{ id: string }>();
   const [metric, setMetric] = useState<"subscriberCount" | "viewCount">("subscriberCount");
+  const [videoSort, setVideoSort] = useState<"newest" | "views">("newest");
+  const [visibleVideos, setVisibleVideos] = useState(20);
 
   const detail = useQuery({
     queryKey: ["channel", id],
     queryFn: async () => (await api.channels[":id"].$get({ param: { id } })).json(),
   });
+
+  const recentVideos = useMemo(() => {
+    const list = [...(detail.data && !("error" in detail.data) ? detail.data.videos : [])];
+    list.sort((a, b) => {
+      if (videoSort === "views") return b.viewCount - a.viewCount || compareDateDesc(a.publishedAt, b.publishedAt);
+      return compareDateDesc(a.publishedAt, b.publishedAt) || b.viewCount - a.viewCount;
+    });
+    return list;
+  }, [detail.data, videoSort]);
 
   if (detail.isLoading) {
     return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
@@ -108,8 +120,68 @@ function ChannelPage() {
           <ShareButton name={channel.name} subscriberCount={latest?.subscriberCount ?? 0} deltaPct={deltaPct} />
         </div>
       </div>
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display font-semibold text-lg">最近の動画</h2>
+          <div className="segmented-control flex gap-1 rounded-lg border p-1">
+            <button
+              onClick={() => setVideoSort("newest")}
+              className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
+                videoSort === "newest" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              新着順
+            </button>
+            <button
+              onClick={() => setVideoSort("views")}
+              className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
+                videoSort === "views" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              再生数順
+            </button>
+          </div>
+        </div>
+
+        {recentVideos.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground">
+            <p className="font-semibold text-foreground">まだ動画データがありません。</p>
+            <p className="mt-2 text-sm">日次収集で直近動画が取得されると、ここに表示されます。</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {recentVideos.slice(0, visibleVideos).map((video) => (
+                <VideoCard
+                  key={video.videoId}
+                  videoId={video.videoId}
+                  title={video.title}
+                  thumbnailUrl={video.thumbnailUrl}
+                  publishedAt={video.publishedAt}
+                  viewCount={video.viewCount}
+                />
+              ))}
+            </div>
+            {visibleVideos < recentVideos.length && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setVisibleVideos((count) => count + 20)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:border-info/60 hover:text-info"
+                >
+                  もっと見る
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
+}
+
+function compareDateDesc(a: string | null, b: string | null) {
+  return Date.parse(b ?? "") - Date.parse(a ?? "");
 }
 
 export default ChannelPage;

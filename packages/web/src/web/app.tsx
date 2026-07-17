@@ -4,6 +4,7 @@ import ChannelsPage from "./pages/channels";
 import ChannelPage from "./pages/channel";
 import MachinesPage from "./pages/machines";
 import MachinePage from "./pages/machine";
+import VideosTrendingPage from "./pages/videos-trending";
 import WeeklyPage from "./pages/weekly";
 import WeeklyDetailPage from "./pages/weekly-detail";
 import AboutPage from "./pages/about";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/channels/:id" component={ChannelPage} />
           <Route path="/machines" component={MachinesPage} />
           <Route path="/machines/:id" component={MachinePage} />
+          <Route path="/videos/trending" component={VideosTrendingPage} />
           <Route path="/weekly" component={WeeklyPage} />
           <Route path="/weekly/:weekOf" component={WeeklyDetailPage} />
           <Route path="/about" component={AboutPage} />

@@ -38,6 +38,42 @@ export const channelSnapshots = sqliteTable(
   (table) => [uniqueIndex("channel_date_idx").on(table.channelId, table.date)],
 );
 
+export const videos = sqliteTable("videos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  videoId: text("video_id").notNull().unique(),
+  channelId: integer("channel_id")
+    .notNull()
+    .references(() => channels.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  publishedAt: text("published_at"),
+  viewCount: integer("view_count").notNull().default(0),
+  likeCount: integer("like_count").notNull().default(0),
+  commentCount: integer("comment_count").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const videoSnapshots = sqliteTable(
+  "video_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    videoId: text("video_id").notNull(),
+    date: text("date").notNull(),
+    viewCount: integer("view_count").notNull(),
+    likeCount: integer("like_count").notNull(),
+    commentCount: integer("comment_count").notNull(),
+    collectedAt: integer("collected_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [uniqueIndex("video_date_idx").on(table.videoId, table.date)],
+);
+
 export const votes = sqliteTable("votes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   channelId: integer("channel_id")

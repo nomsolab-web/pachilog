@@ -127,6 +127,7 @@ export type RecentVideo = {
   videoId: string;
   title: string;
   publishedAt: string;
+  thumbnailUrl: string | null;
 };
 
 export type VideoStats = {
@@ -150,6 +151,7 @@ export async function fetchRecentVideos(playlistId: string, maxResults = 25): Pr
     videoId: item.snippet?.resourceId?.videoId,
     title: item.snippet?.title ?? "",
     publishedAt: item.snippet?.publishedAt ?? null,
+    thumbnailUrl: selectChannelThumbnailUrl(item.snippet?.thumbnails),
   }));
 }
 

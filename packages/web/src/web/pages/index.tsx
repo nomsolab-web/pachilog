@@ -5,6 +5,7 @@ import { CalendarDays, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
 import { formatJapaneseDate } from "../lib/format";
 import { RankingCard } from "../components/ranking-card";
+import { VideoCard } from "../components/video-card";
 
 const PERIODS = [
   { label: "7日", value: 7 },
@@ -31,6 +32,10 @@ function Index() {
   const rankings = useQuery({
     queryKey: ["rankings", period],
     queryFn: async () => (await api.rankings.$get({ query: { period: String(period) } })).json(),
+  });
+  const trendingVideos = useQuery({
+    queryKey: ["videos-trending", "previous", "top"],
+    queryFn: async () => (await api.videos.trending.$get({ query: { mode: "previous" } })).json(),
   });
 
   const list = rankings.data ? (tab === "rising" ? rankings.data.rising : rankings.data.falling) : [];
@@ -65,6 +70,42 @@ function Index() {
             全チャンネル一覧
           </Link>
         </div>
+      </section>
+
+      <section className="mb-10">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-display font-semibold text-xl">前回収集から伸びた動画</h2>
+          <Link to="/videos/trending" className="text-sm text-gold hover:text-gold/80">
+            もっと見る
+          </Link>
+        </div>
+        {trendingVideos.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-64 rounded-xl border surface-card animate-pulse" />
+            ))}
+          </div>
+        ) : (trendingVideos.data?.videos ?? []).length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-10 text-center text-sm text-muted-foreground">
+            動画履歴を蓄積中です。
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {(trendingVideos.data?.videos ?? []).slice(0, 5).map((video) => (
+              <VideoCard
+                key={video.videoId}
+                videoId={video.videoId}
+                title={video.title}
+                thumbnailUrl={video.thumbnailUrl}
+                publishedAt={video.publishedAt}
+                viewCount={video.currentViewCount}
+                channelName={video.channelName}
+                channelThumbnailUrl={video.channelThumbnailUrl}
+                metric={video.hasTrend ? `+${video.viewDelta.toLocaleString("ja-JP")}回` : "データ蓄積中"}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section>

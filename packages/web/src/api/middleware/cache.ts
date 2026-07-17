@@ -4,7 +4,7 @@ import { createMiddleware } from "hono/factory";
 const READ_ONLY_API_CACHE = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
 const NO_STORE = "no-store";
 
-const CACHEABLE_GET_PREFIXES = ["/api/channels", "/api/rankings", "/api/machines", "/api/weekly"];
+const CACHEABLE_GET_PREFIXES = ["/api/channels", "/api/rankings", "/api/machines", "/api/videos", "/api/weekly"];
 const NO_STORE_PREFIXES = ["/api/collect", "/api/collect-machines"];
 
 export const httpCache = createMiddleware(async (c, next) => {

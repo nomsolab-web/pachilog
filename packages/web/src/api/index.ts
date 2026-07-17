@@ -5,6 +5,7 @@ import { rankings } from "./routes/rankings";
 import { collect } from "./routes/collect";
 import { machinesRoute } from "./routes/machines";
 import { collectMachines } from "./routes/collect-machines";
+import { videosRoute } from "./routes/videos";
 import { weekly } from "./routes/weekly";
 import { httpCache } from "./middleware/cache";
 
@@ -19,6 +20,7 @@ const app = new Hono()
   .route("/collect", collect)
   .route("/machines", machinesRoute)
   .route("/collect-machines", collectMachines)
+  .route("/videos", videosRoute)
   .route("/weekly", weekly);
 
 app.onError((err, c) => {

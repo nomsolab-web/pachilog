@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "../database";
-import { channels, channelSnapshots, votes } from "../database/schema";
+import { channels, channelSnapshots, videos, votes } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
 
 export const channelsRoute = new Hono()
@@ -47,7 +47,14 @@ export const channelsRoute = new Hono()
       .where(eq(channelSnapshots.channelId, id))
       .orderBy(asc(channelSnapshots.date));
 
-    return c.json({ channel: ch, snapshots }, 200);
+    const recentVideos = await db
+      .select()
+      .from(videos)
+      .where(eq(videos.channelId, id))
+      .orderBy(desc(videos.publishedAt))
+      .limit(100);
+
+    return c.json({ channel: ch, snapshots, videos: recentVideos }, 200);
   })
   .get("/:id/votes", async (c) => {
     const id = Number(c.req.param("id"));

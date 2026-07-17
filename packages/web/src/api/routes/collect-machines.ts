@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machines } from "../database/schema";
+import { channels, machineMentions, machines, videos as videosTable, videoSnapshots } from "../database/schema";
+import { dateStringInTimeZone } from "../lib/date";
 import {
   fetchRecentVideos,
   fetchUploadsPlaylistId,
@@ -24,11 +25,16 @@ export const collectMachines = new Hono().post("/run", async (c) => {
     skippedNoPlaylist: 0,
     skippedNoVideos: 0,
     mentionsUpserted: 0,
+    videosUpserted: 0,
+    videoSnapshotsInserted: 0,
+    videoSnapshotsSkippedExisting: 0,
+    youtubeVideoStatCalls: 0,
     failedChannels: 0,
     ai: null as Awaited<ReturnType<typeof runAiMachineJudgments>> | null,
     errors: [] as string[],
   };
   const aiCandidates: AiCandidate[] = [];
+  const date = dateStringInTimeZone();
 
   const machineList = await db.select().from(machines);
   if (machineList.length === 0) {
@@ -55,6 +61,60 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         return;
       }
 
+      const stats = await fetchVideoStats([...new Set(videos.map((video) => video.videoId))]);
+      results.youtubeVideoStatCalls += Math.ceil(new Set(videos.map((video) => video.videoId)).size / 50);
+      const statsMap = new Map(stats.map((s) => [s.videoId, s]));
+      for (const video of videos) {
+        const stat = statsMap.get(video.videoId);
+        if (!stat) continue;
+
+        const existingVideo = await db.select().from(videosTable).where(eq(videosTable.videoId, video.videoId));
+        if (existingVideo.length > 0) {
+          await db
+            .update(videosTable)
+            .set({
+              channelId: ch.id,
+              title: video.title,
+              thumbnailUrl: video.thumbnailUrl,
+              publishedAt: video.publishedAt,
+              viewCount: stat.viewCount,
+              likeCount: stat.likeCount,
+              commentCount: stat.commentCount,
+              updatedAt: new Date(),
+            })
+            .where(eq(videosTable.id, existingVideo[0].id));
+        } else {
+          await db.insert(videosTable).values({
+            videoId: video.videoId,
+            channelId: ch.id,
+            title: video.title,
+            thumbnailUrl: video.thumbnailUrl,
+            publishedAt: video.publishedAt,
+            viewCount: stat.viewCount,
+            likeCount: stat.likeCount,
+            commentCount: stat.commentCount,
+          });
+        }
+        results.videosUpserted += 1;
+
+        const existingSnapshot = await db
+          .select()
+          .from(videoSnapshots)
+          .where(and(eq(videoSnapshots.videoId, video.videoId), eq(videoSnapshots.date, date)));
+        if (existingSnapshot.length > 0) {
+          results.videoSnapshotsSkippedExisting += 1;
+        } else {
+          await db.insert(videoSnapshots).values({
+            videoId: video.videoId,
+            date,
+            viewCount: stat.viewCount,
+            likeCount: stat.likeCount,
+            commentCount: stat.commentCount,
+          });
+          results.videoSnapshotsInserted += 1;
+        }
+      }
+
       const matches = videos.flatMap((video) =>
         findMachineMatches(video.title, machineList).map((machine) => ({ video, machine })),
       );
@@ -65,9 +125,6 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         results.channelsScanned += 1;
         return;
       }
-
-      const stats = await fetchVideoStats([...new Set(matches.map((x) => x.video.videoId))]);
-      const statsMap = new Map(stats.map((s) => [s.videoId, s]));
 
       for (const { video, machine } of matches) {
         const stat = statsMap.get(video.videoId);
