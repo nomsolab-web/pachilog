@@ -156,6 +156,8 @@ function Index() {
                 delta={entry.delta}
                 deltaPct={entry.deltaPct}
                 snapshotCount={entry.snapshotCount}
+                comparisonDays={entry.comparisonDays}
+                isProvisional={entry.isProvisional}
               />
             ))}
           </div>

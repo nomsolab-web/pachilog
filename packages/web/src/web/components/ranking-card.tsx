@@ -15,6 +15,8 @@ type Props = {
   delta: number;
   deltaPct: number;
   snapshotCount: number;
+  comparisonDays: number;
+  isProvisional: boolean;
 };
 
 export function RankingCard({
@@ -28,6 +30,8 @@ export function RankingCard({
   delta,
   deltaPct,
   snapshotCount,
+  comparisonDays,
+  isProvisional,
 }: Props) {
   const hasTrend = snapshotCount > 1;
   const rising = delta >= 0;
@@ -51,6 +55,7 @@ export function RankingCard({
             <Users className="size-3" />
             {formatJapaneseCount(latestSubscriberCount, "人")}
           </p>
+          {isProvisional && <p className="text-xs text-info mt-1">暫定集計{comparisonDays}日目</p>}
         </div>
       </Link>
       <div className={`flex shrink-0 items-center gap-1 font-display font-bold text-sm px-2.5 py-1.5 rounded-lg ${trendClass}`}>

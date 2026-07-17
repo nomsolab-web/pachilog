@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../database";
 import { channels, channelSnapshots } from "../database/schema";
+import { selectComparisonSnapshots } from "../lib/ranking";
 
 const ALLOWED_PERIODS = new Set([7, 30, 90]);
 
@@ -16,11 +17,9 @@ export const rankings = new Hono().get("/", async (c) => {
         .select()
         .from(channelSnapshots)
         .where(eq(channelSnapshots.channelId, channel.id))
-        .orderBy(desc(channelSnapshots.date))
-        .limit(period + 1);
+        .orderBy(desc(channelSnapshots.date), desc(channelSnapshots.collectedAt));
 
-      const latest = snapshots[0];
-      const base = snapshots[snapshots.length - 1];
+      const { latest, base, comparisonDays, isProvisional } = selectComparisonSnapshots(snapshots, period);
       if (!latest || !base) return null;
 
       const delta = latest.subscriberCount - base.subscriberCount;
@@ -35,7 +34,9 @@ export const rankings = new Hono().get("/", async (c) => {
         thumbnailUrl: channel.thumbnailUrl,
         latestSubscriberCount: latest.subscriberCount,
         latestDate: latest.date,
-        snapshotCount: snapshots.length,
+        snapshotCount: comparisonDays,
+        comparisonDays,
+        isProvisional,
         delta,
         deltaPct: Number(deltaPct.toFixed(2)),
       };
