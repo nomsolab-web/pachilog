@@ -14,10 +14,10 @@ interface MachineMaster {
   uniqueAliases: string[];
   ambiguousAliases: string[];
   resolvingSubKeywords: string[];
-  competingMachines: string[];
+  competingMachines: string[]; // These act as negative keywords (exclusion terms) to prevent version crossing
 }
 
-// 精密に設計した20機種の機種マスタリスト（バージョン間の競合・Substringの被りを徹底回避）
+// 精密に設計した21機種の機種マスタリスト（バージョン間の競合・Substringの被りを徹底回避）
 const machinesMasterList: MachineMaster[] = [
   {
     name: "eフィーバー　シン・エヴァンゲリオン　Type レイ",
@@ -30,7 +30,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["シン・エヴァンゲリオン Type レイ", "シンエヴァ Typeレイ", "シンエヴァTypeレイ", "エヴァ16 Typeレイ", "エヴァ16Typeレイ", "Typeレイ", "Type レイ"],
     ambiguousAliases: ["エヴァ", "エヴァンゲリオン", "シンエヴァ", "シン・エヴァンゲリオン"],
     resolvingSubKeywords: ["レイ", "16", "スマパチ"],
-    competingMachines: ["e Re:ゼロから始める異世界生活 season2", "Pゴジラ対エヴァンゲリオン G-FREE"]
+    competingMachines: ["e Re:ゼロから始める異世界生活 season2", "Pゴジラ対エヴァンゲリオン G-FREE", "カヲル", "ゲンドウ", "未来への咆哮", "15", "使徒、再び"]
   },
   {
     name: "スマスロ北斗の拳",
@@ -43,7 +43,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["スマスロ北斗", "スマスロ北斗の拳", "L北斗の拳", "L北斗"],
     ambiguousAliases: ["北斗", "北斗の拳"],
     resolvingSubKeywords: ["スマスロ", "本前兆", "宿命", "北斗揃い", "無双転生"],
-    competingMachines: ["P真・北斗無双 第4章", "スマスロ 北斗の拳 転生の章2"]
+    competingMachines: ["転生", "暴凶星", "強敵", "無双", "11", "修羅", "天昇"]
   },
   {
     name: "スマスロ 北斗の拳 転生の章2",
@@ -56,7 +56,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["スマスロ北斗の拳 転生の章2", "北斗の拳 転生の章2", "北斗転生2", "転生の章2", "北斗転生の章2"],
     ambiguousAliases: ["北斗", "北斗の拳"],
     resolvingSubKeywords: ["転生2", "あべし", "闘神演舞", "神拳勝舞", "勝舞魂"],
-    competingMachines: ["スマスロ北斗の拳"]
+    competingMachines: ["宿命", "強敵", "暴凶星", "無双"]
   },
   {
     name: "パチスロ甲鉄城のカバネリ",
@@ -69,7 +69,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["カバネリ 6.5", "6.5号機カバネリ", "カバネリ美馬", "カバネリ無名"],
     ambiguousAliases: ["カバネリ", "甲鉄城のカバネリ"],
     resolvingSubKeywords: ["美馬", "無名", "さらば諭吉", "裏美馬", "ST"],
-    competingMachines: ["スマスロ 甲鉄城のカバネリ 海門決戦"]
+    competingMachines: ["海門", "決戦", "カバネリ2", "カバネリ 2"]
   },
   {
     name: "スマスロ 甲鉄城のカバネリ 海門決戦",
@@ -82,7 +82,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["スマスロ甲鉄城のカバネリ 海門決戦", "カバネリ 海門決戦", "カバネリ海門決戦", "カバネリ2", "海門決戦"],
     ambiguousAliases: ["カバネリ", "甲鉄城のカバネリ"],
     resolvingSubKeywords: ["海門", "うなと", "決戦"],
-    competingMachines: ["パチスロ甲鉄城のカバネリ"]
+    competingMachines: ["6.5"]
   },
   {
     name: "L戦国乙女4 戦乱に閃く炯眼の軍師",
@@ -95,7 +95,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["戦国乙女4", "乙女4", "L戦国乙女4", "L戦国乙女4 戦乱に閃く炯眼の軍師"],
     ambiguousAliases: ["戦国乙女", "乙女"],
     resolvingSubKeywords: ["乙女4", "4", "ヨシテル", "ムサシ", "炯眼"],
-    competingMachines: ["L戦国乙女5 業火を穿つ宿焔の双刃"]
+    competingMachines: ["5", "乙女5", "深淵"]
   },
   {
     name: "L戦国乙女5 業火を穿つ宿焔 of 敢戦の双刃",
@@ -108,7 +108,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["L戦国乙女5 業火を穿つ宿焔の双刃", "戦国乙女5", "乙女5", "L戦国乙女5"],
     ambiguousAliases: ["戦国乙女", "乙女"],
     resolvingSubKeywords: ["5", "宿焔", "石川ゴエモン", "強カワRUSH", "本能寺の変"],
-    competingMachines: ["L戦国乙女4 戦乱に閃く炯眼の軍師"]
+    competingMachines: ["4", "乙女4"]
   },
   {
     name: "P大海物語5",
@@ -120,8 +120,8 @@ const machinesMasterList: MachineMaster[] = [
     verified: true,
     uniqueAliases: ["大海物語5", "大海5"],
     ambiguousAliases: ["大海", "大海物語"],
-    resolvingSubKeywords: ["5", "マリン", "パール", "スペシャル", "SP"],
-    competingMachines: ["PAスーパー海物語 IN 沖縄6", "P大海物語5スペシャル", "P大海物語5 ブラック", "大海4"]
+    resolvingSubKeywords: ["5"],
+    competingMachines: ["4", "大海4", "ブラック", "BLACK", "スペシャル", "SP", "沖縄", "地中海"]
   },
   {
     name: "P大海物語5 ブラック",
@@ -134,7 +134,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["大海物語5 ブラック", "大海5 ブラック", "大海5ブラック"],
     ambiguousAliases: ["大海", "大海物語"],
     resolvingSubKeywords: ["ブラック", "199", "黒海"],
-    competingMachines: ["P大海物語5"]
+    competingMachines: ["4", "大海4", "沖縄", "地中海"]
   },
   {
     name: "P大海物語5スペシャル",
@@ -147,7 +147,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["大海物語5スペシャル", "大海5スペシャル", "大海5SP", "大海物語5SP"],
     ambiguousAliases: ["大海", "大海物語"],
     resolvingSubKeywords: ["スペシャル", "SP"],
-    competingMachines: ["P大海物語5"]
+    competingMachines: ["4", "大海4", "ブラック", "BLACK", "沖縄", "地中海"]
   },
   {
     name: "パチスロ からくりサーカス",
@@ -160,7 +160,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["スマスロからくりサーカス", "Lからくりサーカス", "Lからくり"],
     ambiguousAliases: ["からくりサーカス", "からくり", "からサー"],
     resolvingSubKeywords: ["鳴海", "勝", "しろがね", "オリンピア", "極劇"],
-    competingMachines: ["Lパチスロ からくりサーカス2"]
+    competingMachines: ["2", "からくり2"]
   },
   {
     name: "P牙狼11〜冴島大河〜XX",
@@ -238,7 +238,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["からくりサーカス2", "からくり2", "Lからくりサーカス2"],
     ambiguousAliases: ["からくりサーカス", "からくり"],
     resolvingSubKeywords: ["2"],
-    competingMachines: ["パチスロ からくりサーカス"]
+    competingMachines: []
   },
   {
     name: "Pフィーバーブルーロック Light ver.",
@@ -343,6 +343,18 @@ async function analyze() {
     let ambiguousToMachine = false;
 
     for (const m of machinesMasterList) {
+      // Check negative keywords (competing/exclusion terms) first
+      let matchesCompeting = false;
+      for (const comp of m.competingMachines) {
+        if (titleNorm.includes(normalizeText(comp))) {
+          matchesCompeting = true;
+          break;
+        }
+      }
+      if (matchesCompeting) {
+        continue;
+      }
+
       // 1. Check unique aliases
       let isUniqueMatch = false;
       for (const ua of m.uniqueAliases) {
