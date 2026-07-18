@@ -210,4 +210,10 @@ export const machinesRoute = new Hono()
       manualCount: vManual.length,
       excludedCount: vExcluded.length,
     }, 200);
+  })
+  .get("/debug/db-env", async (c) => {
+    const url = process.env.DATABASE_URL || "NOT_SET";
+    const token = process.env.DATABASE_AUTH_TOKEN || "NOT_SET";
+    const maskedToken = token !== "NOT_SET" ? token.slice(0, 8) + "..." : "NOT_SET";
+    return c.json({ url, token: maskedToken }, 200);
   });
