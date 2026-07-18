@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machines, videos as videosTable, videoSnapshots } from "../database/schema";
+import { channels, machineMentions, machines, videos as videosTable, videoSnapshots, videoMachineLinks } from "../database/schema";
 import { dateStringInTimeZone } from "../lib/date";
 import {
   fetchRecentVideos,
@@ -10,7 +10,7 @@ import {
   isSuccessfulCollectionRate,
   mapWithConcurrency,
 } from "../lib/youtube";
-import { findMachineMatches } from "../lib/machine-match";
+import { findDetailedMachineMatches } from "../lib/machine-match";
 import { buildAiCandidates, runAiMachineJudgments, type AiCandidate } from "../lib/machine-ai";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
@@ -115,39 +115,77 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         }
       }
 
-      const matches = videos.flatMap((video) =>
-        findMachineMatches(video.title, machineList).map((machine) => ({ video, machine })),
-      );
-      const matchedVideoIds = new Set(matches.map((match) => match.video.videoId));
-      aiCandidates.push(...buildAiCandidates(videos.filter((video) => !matchedVideoIds.has(video.videoId)), ch, machineList));
-
-      if (matches.length === 0) {
-        results.channelsScanned += 1;
-        return;
-      }
-
-      for (const { video, machine } of matches) {
+      for (const video of videos) {
         const stat = statsMap.get(video.videoId);
-        if (!stat || !machine) continue;
+        if (!stat) continue;
 
-        const existing = await db
+        // Fetch existing video record to check matchStatus
+        const [dbVideo] = await db.select().from(videosTable).where(eq(videosTable.videoId, video.videoId));
+        
+        // If it is manually matched or manual_excluded, DO NOT run auto matching
+        if (dbVideo && (dbVideo.matchStatus === "manual" || dbVideo.matchStatus === "manual_excluded")) {
+          continue;
+        }
+
+        // Run detailed matching logic
+        const autoMatches = findDetailedMachineMatches(video.title, machineList);
+
+        // Fetch existing links for this video to keep manual ones
+        const existingLinks = await db
           .select()
-          .from(machineMentions)
-          .where(and(eq(machineMentions.machineId, machine.id), eq(machineMentions.videoId, video.videoId)));
+          .from(videoMachineLinks)
+          .where(eq(videoMachineLinks.videoId, video.videoId));
 
-        if (existing.length > 0) {
+        const manualLinks = existingLinks.filter(l => l.matchMethod === "manual" || l.matchMethod === "manual_excluded");
+        const manualMachineIds = new Set(manualLinks.map(l => l.machineId));
+
+        // Delete all old auto-matched links
+        if (existingLinks.some(l => ["exact_name", "alias"].includes(l.matchMethod))) {
           await db
-            .update(machineMentions)
-            .set({
-              viewCount: stat.viewCount,
-              likeCount: stat.likeCount,
-              commentCount: stat.commentCount,
-              updatedAt: new Date(),
-            })
-            .where(eq(machineMentions.id, existing[0].id));
-        } else {
+            .delete(videoMachineLinks)
+            .where(
+              and(
+                eq(videoMachineLinks.videoId, video.videoId),
+                inArray(videoMachineLinks.matchMethod, ["exact_name", "alias"])
+              )
+            );
+        }
+
+        // Filter and insert new auto-matched links (ignoring any machines already covered by manual link/exclude)
+        const newLinksToInsert = autoMatches.filter(m => !manualMachineIds.has(m.machineId));
+        
+        for (const link of newLinksToInsert) {
+          await db.insert(videoMachineLinks).values({
+            videoId: video.videoId,
+            machineId: link.machineId,
+            matchConfidence: link.matchConfidence,
+            matchMethod: link.matchMethod,
+          });
+        }
+
+        // Determine final match status
+        const activeLinks = await db
+          .select()
+          .from(videoMachineLinks)
+          .where(eq(videoMachineLinks.videoId, video.videoId));
+
+        // Note: manual_excluded links are not counted as active "matched" machines
+        const hasMatchedMachines = activeLinks.some(l => l.matchMethod !== "manual_excluded");
+
+        const finalStatus = hasMatchedMachines ? "matched" : "unmatched";
+        await db
+          .update(videosTable)
+          .set({ matchStatus: finalStatus, updatedAt: new Date() })
+          .where(eq(videosTable.videoId, video.videoId));
+
+        // Rebuild machine_mentions cache for this video
+        await db.delete(machineMentions).where(eq(machineMentions.videoId, video.videoId));
+
+        for (const link of activeLinks) {
+          if (link.matchMethod === "manual_excluded") continue; // Exclude manually unlinked ones from public view
+          
           await db.insert(machineMentions).values({
-            machineId: machine.id,
+            machineId: link.machineId,
             channelId: ch.id,
             videoId: video.videoId,
             videoTitle: video.title,
@@ -156,9 +194,29 @@ export const collectMachines = new Hono().post("/run", async (c) => {
             commentCount: stat.commentCount,
             publishedAt: video.publishedAt,
           });
+          results.mentionsUpserted += 1;
         }
-        results.mentionsUpserted += 1;
       }
+
+      // Populate aiCandidates for videos that remain unmatched
+      const allActiveLinks = await db
+        .select()
+        .from(videoMachineLinks)
+        .where(
+          and(
+            inArray(videoMachineLinks.videoId, videos.map((v) => v.videoId)),
+            inArray(videoMachineLinks.matchMethod, ["manual", "exact_name", "alias"])
+          )
+        );
+      const matchedVideoIds = new Set(allActiveLinks.map((l) => l.videoId));
+      
+      aiCandidates.push(
+        ...buildAiCandidates(
+          videos.filter((video) => !matchedVideoIds.has(video.videoId)),
+          ch,
+          machineList
+        )
+      );
 
       results.channelsScanned += 1;
     } catch (err) {

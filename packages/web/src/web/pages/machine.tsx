@@ -36,6 +36,81 @@ function MachinePage() {
     return sorted;
   }, [detail.data, sortMode]);
 
+  // Group sorted mentions by release date
+  const groups = useMemo(() => {
+    const preRelease: VideoMention[] = [];
+    const postRelease7: VideoMention[] = [];
+    const postReleaseAfter: VideoMention[] = [];
+    const unclassified: VideoMention[] = [];
+
+    if (!detail.data || "error" in detail.data) {
+      return { preRelease, postRelease7, postReleaseAfter, unclassified };
+    }
+
+    const releaseDate = detail.data.machine.releaseDate;
+    if (!releaseDate) {
+      return {
+        preRelease,
+        postRelease7,
+        postReleaseAfter,
+        unclassified: mentions,
+      };
+    }
+
+    const relTime = new Date(releaseDate).getTime();
+    if (isNaN(relTime)) {
+      return {
+        preRelease,
+        postRelease7,
+        postReleaseAfter,
+        unclassified: mentions,
+      };
+    }
+
+    // 7 days in milliseconds: 7 * 24 * 60 * 60 * 1000
+    const relTimePlus7 = relTime + 7 * 24 * 60 * 60 * 1000;
+
+    for (const video of mentions) {
+      if (!video.publishedAt) {
+        unclassified.push(video);
+        continue;
+      }
+      const pubTime = new Date(video.publishedAt).getTime();
+      if (isNaN(pubTime)) {
+        unclassified.push(video);
+        continue;
+      }
+
+      if (pubTime < relTime) {
+        preRelease.push(video);
+      } else if (pubTime <= relTimePlus7) {
+        postRelease7.push(video);
+      } else {
+        postReleaseAfter.push(video);
+      }
+    }
+
+    return { preRelease, postRelease7, postReleaseAfter, unclassified };
+  }, [mentions, detail.data]);
+
+  const tabs = [
+    { id: "postRelease7", label: "導入後7日以内", count: groups.postRelease7.length, data: groups.postRelease7 },
+    { id: "postReleaseAfter", label: "導入8日目以降", count: groups.postReleaseAfter.length, data: groups.postReleaseAfter },
+    { id: "preRelease", label: "導入前", count: groups.preRelease.length, data: groups.preRelease },
+    { id: "unclassified", label: "分類不能", count: groups.unclassified.length, data: groups.unclassified },
+  ];
+
+  // Pick first tab that has items, default to the first tab (postRelease7)
+  const defaultTab = tabs.find(t => t.count > 0)?.id || "postRelease7";
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+
+  // Sync activeTab if defaultTab changes (e.g. data loads)
+  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
+  if (defaultTab !== prevDefaultTab) {
+    setPrevDefaultTab(defaultTab);
+    setActiveTab(defaultTab);
+  }
+
   if (detail.isLoading) {
     return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
   }
@@ -45,7 +120,8 @@ function MachinePage() {
   }
 
   const { machine, summary } = detail.data;
-  const visibleMentions = mentions.slice(0, visibleCount);
+  const activeGroupVideos = tabs.find(t => t.id === activeTab)?.data || [];
+  const visibleMentions = activeGroupVideos.slice(0, visibleCount);
 
   return (
     <div>
@@ -65,12 +141,23 @@ function MachinePage() {
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Film className="size-4" />
-                {machine.type ?? "種別未設定"}
+                {machine.type === "pachinko" ? "パチンコ" : machine.type === "slot" ? "パチスロ" : "種別未設定"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <CalendarDays className="size-4" />
                 {machine.releaseDate ? `${formatDate(machine.releaseDate)} 導入` : "導入日未設定"}
               </span>
+              {machine.officialUrl && (
+                <a
+                  href={machine.officialUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-info hover:text-info/80 font-semibold"
+                >
+                  <ExternalLink className="size-4" />
+                  公式サイト
+                </a>
+              )}
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               集計期間: {summary.periodStart && summary.periodEnd ? `${formatDate(summary.periodStart)} - ${formatDate(summary.periodEnd)}` : "データ蓄積中"}
@@ -116,11 +203,41 @@ function MachinePage() {
           </div>
         </div>
 
+        {/* Category Tabs */}
+        {mentions.length > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setVisibleCount(20);
+                }}
+                className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === tab.id
+                    ? "border-info text-info"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {mentions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground">
             <SearchX className="mx-auto mb-3 size-8 text-info" />
             <p className="font-semibold text-foreground">まだ関連動画が見つかっていません。</p>
             <p className="mt-2 text-sm">日次収集で該当動画が見つかると、ここに一覧表示されます。</p>
+          </div>
+        ) : activeGroupVideos.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground">
+            <SearchX className="mx-auto mb-3 size-8 text-info" />
+            <p className="font-semibold text-foreground">この分類には動画がありません。</p>
           </div>
         ) : (
           <>
@@ -129,7 +246,7 @@ function MachinePage() {
                 <VideoCard key={mention.videoId} mention={mention as VideoMention} />
               ))}
             </div>
-            {visibleCount < mentions.length && (
+            {visibleCount < activeGroupVideos.length && (
               <div className="mt-6 text-center">
                 <button
                   onClick={() => setVisibleCount((count) => count + 20)}
@@ -147,8 +264,10 @@ function MachinePage() {
 }
 
 function VideoCard({ mention }: { mention: VideoMention }) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${mention.videoId}`;
-  const thumbnailUrl = `https://i.ytimg.com/vi/${mention.videoId}/hqdefault.jpg`;
+  // Validate that video ID only contains safe YouTube ID characters
+  const safeVideoId = /^[a-zA-Z0-9_-]+$/.test(mention.videoId) ? mention.videoId : "";
+  const youtubeUrl = safeVideoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(safeVideoId)}` : "#";
+  const thumbnailUrl = safeVideoId ? `https://i.ytimg.com/vi/${encodeURIComponent(safeVideoId)}/hqdefault.jpg` : "";
 
   return (
     <article className="interactive-card overflow-hidden rounded-xl border">
@@ -159,7 +278,9 @@ function VideoCard({ mention }: { mention: VideoMention }) {
         aria-label={`${mention.videoTitle} をYouTubeで見る`}
         className="block"
       >
-        <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-video w-full object-cover bg-secondary" />
+        {thumbnailUrl && (
+          <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-video w-full object-cover bg-secondary" />
+        )}
       </a>
       <div className="p-4">
         <h3 className="line-clamp-2 min-h-11 font-semibold leading-snug">{mention.videoTitle}</h3>

@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machines, machineVideoJudgments } from "../database/schema";
+import { channels, machineMentions, machines, machineVideoJudgments, videoMachineLinks, videos as videosTable } from "../database/schema";
 import { fetchVideoStats, type RecentVideo } from "./youtube";
 import { findAmbiguousMachineCandidates } from "./machine-match";
 import { parseGeminiBatchJudgments, type GeminiJudgment } from "./machine-ai-parse";
@@ -160,6 +160,13 @@ async function publishAcceptedJudgments(candidates: readonly AiCandidate[]) {
   for (const candidate of candidates) {
     const stat = statsMap.get(candidate.video.videoId);
     if (!stat) continue;
+    
+    // Check manual override
+    const [dbVideo] = await db.select().from(videosTable).where(eq(videosTable.videoId, candidate.video.videoId));
+    if (dbVideo && (dbVideo.matchStatus === "manual" || dbVideo.matchStatus === "manual_excluded")) {
+      continue;
+    }
+
     const existing = await db
       .select()
       .from(machineMentions)
@@ -187,6 +194,22 @@ async function publishAcceptedJudgments(candidates: readonly AiCandidate[]) {
         publishedAt: candidate.video.publishedAt,
       });
     }
+
+    // Also update videoMachineLinks
+    const linkExisting = await db
+      .select()
+      .from(videoMachineLinks)
+      .where(and(eq(videoMachineLinks.videoId, candidate.video.videoId), eq(videoMachineLinks.machineId, candidate.machine.id)));
+    if (linkExisting.length === 0) {
+      await db.insert(videoMachineLinks).values({
+        videoId: candidate.video.videoId,
+        machineId: candidate.machine.id,
+        matchConfidence: 90, // AI match
+        matchMethod: "alias",
+      });
+    }
+
+    await db.update(videosTable).set({ matchStatus: "matched", updatedAt: new Date() }).where(eq(videosTable.videoId, candidate.video.videoId));
   }
 }
 

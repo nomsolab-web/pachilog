@@ -5,9 +5,9 @@
  *   bun packages/web/src/api/data/machine-ai-admin.ts approve <judgmentId>
  *   bun packages/web/src/api/data/machine-ai-admin.ts reject <judgmentId>
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../database";
-import { machineMentions, machineVideoJudgments } from "../database/schema";
+import { machineMentions, machineVideoJudgments, videoMachineLinks, videos as videosTable } from "../database/schema";
 import { fetchVideoStats } from "../lib/youtube";
 
 async function main() {
@@ -59,6 +59,22 @@ async function approve(id: number) {
       publishedAt: judgment.publishedAt,
     });
   }
+
+  // Also update videoMachineLinks
+  const linkExisting = await db
+    .select()
+    .from(videoMachineLinks)
+    .where(and(eq(videoMachineLinks.videoId, judgment.videoId), eq(videoMachineLinks.machineId, judgment.machineId)));
+  if (linkExisting.length === 0) {
+    await db.insert(videoMachineLinks).values({
+      videoId: judgment.videoId,
+      machineId: judgment.machineId,
+      matchConfidence: judgment.confidence,
+      matchMethod: "alias",
+    });
+  }
+
+  await db.update(videosTable).set({ matchStatus: "matched", updatedAt: new Date() }).where(eq(videosTable.videoId, judgment.videoId));
 
   await db.update(machineVideoJudgments).set({ status: "auto_linked", updatedAt: new Date() }).where(eq(machineVideoJudgments.id, id));
   console.log(`Approved judgment ${id}.`);

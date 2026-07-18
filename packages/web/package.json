@@ -13,9 +13,10 @@
     "lint": "cd ../.. && oxlint packages/web --deny-warnings --no-error-on-unmatched-pattern",
     "preview": "bun run build && vite preview",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate",
-    "db:migrate": "bun --env-file=../../.env drizzle-kit migrate",
+    "db:migrate": "bun --env-file=../../.env src/api/database/migrate.ts",
     "db:push": "bun --env-file=../../.env drizzle-kit push",
-    "db:studio": "bun --env-file=../../.env drizzle-kit studio"
+    "db:studio": "bun --env-file=../../.env drizzle-kit studio",
+    "admin-cli": "bun --env-file=../../.env src/api/data/admin-cli.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

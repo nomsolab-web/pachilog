@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machineVotes, machines } from "../database/schema";
+import { channels, machineMentions, machineVotes, machines, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
 
 export const machinesRoute = new Hono()
@@ -13,11 +13,64 @@ export const machinesRoute = new Hono()
         const mentions = await db.select().from(machineMentions).where(eq(machineMentions.machineId, m.id));
         const totalViews = mentions.reduce((sum, x) => sum + x.viewCount, 0);
         const videoCount = mentions.length;
-        return { ...m, totalViews, videoCount };
+
+        // Calculate momentum (views gained in the last 7 days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
+
+        let recentViews = 0;
+        let recentVideoCount = 0;
+
+        for (const mention of mentions) {
+          // Find the snapshot of this video from 7 days ago
+          const [snapshot] = await db
+            .select()
+            .from(videoSnapshots)
+            .where(
+              and(
+                eq(videoSnapshots.videoId, mention.videoId),
+                eq(videoSnapshots.date, sevenDaysAgoStr)
+              )
+            )
+            .limit(1);
+
+          let baseViews = 0;
+          if (snapshot) {
+            baseViews = snapshot.viewCount;
+            recentViews += Math.max(0, mention.viewCount - baseViews);
+            recentVideoCount += 1;
+          } else {
+            // If no snapshot exists exactly 7 days ago, we search for the oldest snapshot within the 7-day window.
+            const oldestSnapshot = await db
+              .select()
+              .from(videoSnapshots)
+              .where(
+                and(
+                  eq(videoSnapshots.videoId, mention.videoId),
+                  gte(videoSnapshots.date, sevenDaysAgoStr)
+                )
+              )
+              .orderBy(asc(videoSnapshots.date))
+              .limit(1);
+            if (oldestSnapshot[0]) {
+              baseViews = oldestSnapshot[0].viewCount;
+              recentViews += Math.max(0, mention.viewCount - baseViews);
+              recentVideoCount += 1;
+            } else {
+              // If absolutely no snapshots exist, we assume all views are recent
+              recentViews += mention.viewCount;
+              recentVideoCount += 1;
+            }
+          }
+        }
+
+        return { ...m, totalViews, videoCount, recentViews, recentVideoCount };
       }),
     );
 
-    withBuzz.sort((a, b) => b.totalViews - a.totalViews);
+    // Sort by momentum (recentViews) descending
+    withBuzz.sort((a, b) => b.recentViews - a.recentViews || b.totalViews - a.totalViews);
     return c.json({ machines: withBuzz }, 200);
   })
   .get("/:id", async (c) => {

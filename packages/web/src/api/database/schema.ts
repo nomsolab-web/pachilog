@@ -50,6 +50,9 @@ export const videos = sqliteTable("videos", {
   viewCount: integer("view_count").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),
+  matchStatus: text("match_status", { enum: ["pending", "matched", "unmatched", "manual_excluded"] })
+    .notNull()
+    .default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -94,11 +97,15 @@ export const machines = sqliteTable("machines", {
   excludeTerms: text("exclude_terms", { mode: "json" }).$type<string[]>(),
   type: text("type"),
   maker: text("maker"),
+  series: text("series"),
   releaseDate: text("release_date"),
   thumbnailUrl: text("thumbnail_url"),
   sourceUrl: text("source_url"),
+  officialUrl: text("official_url"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
     .$defaultFn(() => new Date()),
 });
 
@@ -174,3 +181,25 @@ export const weeklySummaries = sqliteTable("weekly_summaries", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+export const videoMachineLinks = sqliteTable(
+  "video_machine_links",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    videoId: text("video_id")
+      .notNull()
+      .references(() => videos.videoId, { onDelete: "cascade" }),
+    machineId: integer("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    matchConfidence: integer("match_confidence").notNull().default(0),
+    matchMethod: text("match_method").notNull(), // exact_name, alias, manual, manual_excluded
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [uniqueIndex("video_machine_link_idx").on(table.videoId, table.machineId)],
+);
