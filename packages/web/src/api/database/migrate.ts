@@ -26,47 +26,104 @@ const client = createClient({
 
 const db = drizzle(client);
 
+async function verifyBaselineStructure(client: any, tableNames: string[]): Promise<boolean> {
+  const expectedTables = [
+    "channel_snapshots",
+    "channels",
+    "machine_mentions",
+    "machine_video_judgments",
+    "machine_votes",
+    "machines",
+    "video_snapshots",
+    "videos",
+    "votes",
+    "weekly_summaries",
+  ];
+
+  // 1. Check if it's a completely empty database (ignoring sqlite internal tables)
+  const userTables = tableNames.filter((name) => name !== "sqlite_sequence");
+  if (userTables.length === 0) {
+    console.log("Database is completely empty. Will run all migrations normally.");
+    return false; // Not baselining, normal migration will run
+  }
+
+  // 2. Check if all expected tables exist
+  const missingTables = expectedTables.filter((table) => !tableNames.includes(table));
+  if (missingTables.length > 0) {
+    throw new Error(
+      `Mismatched database structure for baselining migration 0000. Missing tables: ${missingTables.join(
+        ", "
+      )}.`
+    );
+  }
+
+  // 3. Verify columns for critical tables to be 100% sure
+  const channelsInfo = await client.execute("PRAGMA table_info(channels)");
+  const channelsCols = channelsInfo.rows.map((r: any) => r.name);
+  if (!channelsCols.includes("youtube_channel_id") || !channelsCols.includes("handle")) {
+    throw new Error("Mismatched columns in 'channels' table for baselining migration 0000.");
+  }
+
+  const videosInfo = await client.execute("PRAGMA table_info(videos)");
+  const videosCols = videosInfo.rows.map((r: any) => r.name);
+  if (!videosCols.includes("video_id") || !videosCols.includes("title")) {
+    throw new Error("Mismatched columns in 'videos' table for baselining migration 0000.");
+  }
+
+  const machinesInfo = await client.execute("PRAGMA table_info(machines)");
+  const machinesCols = machinesInfo.rows.map((r: any) => r.name);
+  if (!machinesCols.includes("name") || !machinesCols.includes("maker")) {
+    throw new Error("Mismatched columns in 'machines' table for baselining migration 0000.");
+  }
+
+  console.log("Database structure matches 0000 migration schema. Safe to baseline.");
+  return true;
+}
+
 async function run() {
   // 1. Check if the database has tables but no __drizzle_migrations table
   const tablesResult = await client.execute("SELECT name FROM sqlite_master WHERE type='table'");
   const tableNames = tablesResult.rows.map(r => r.name as string);
 
   const hasMigrationsTable = tableNames.includes("__drizzle_migrations");
-  const hasExistingTables = tableNames.includes("channels") || tableNames.includes("videos");
 
-  if (!hasMigrationsTable && hasExistingTables) {
-    console.log("Existing database detected without migration metadata. Baselining migration 0000...");
+  if (!hasMigrationsTable) {
+    const shouldBaseline = await verifyBaselineStructure(client, tableNames);
 
-    // Create __drizzle_migrations table manually
-    await client.execute(`
-      CREATE TABLE \`__drizzle_migrations\` (
-        \`id\` integer PRIMARY KEY AUTOINCREMENT,
-        \`hash\` text NOT NULL,
-        \`created_at\` integer
-      );
-    `);
+    if (shouldBaseline) {
+      console.log("Existing database detected without migration metadata. Baselining migration 0000...");
 
-    // Find the 0000 migration file and compute its hash
-    const migrationsDir = path.join(__dirname, "../../../drizzle");
-    const journalPath = path.join(migrationsDir, "meta/_journal.json");
-    const journal = JSON.parse(fs.readFileSync(journalPath, "utf-8"));
-    const baseEntry = journal.entries.find((e: any) => e.idx === 0);
+      // Create __drizzle_migrations table manually
+      await client.execute(`
+        CREATE TABLE \`__drizzle_migrations\` (
+          \`id\` integer PRIMARY KEY AUTOINCREMENT,
+          \`hash\` text NOT NULL,
+          \`created_at\` integer
+        );
+      `);
 
-    if (baseEntry) {
-      const sqlFileName = `${baseEntry.tag}.sql`;
-      const sqlPath = path.join(migrationsDir, sqlFileName);
-      const sqlContent = fs.readFileSync(sqlPath, "utf-8");
-      
-      // Drizzle ORM calculates hash on the exact content of the file
-      const hash = crypto.createHash("sha256").update(sqlContent).digest("hex");
+      // Find the 0000 migration file and compute its hash
+      const migrationsDir = path.join(__dirname, "../../../drizzle");
+      const journalPath = path.join(migrationsDir, "meta/_journal.json");
+      const journal = JSON.parse(fs.readFileSync(journalPath, "utf-8"));
+      const baseEntry = journal.entries.find((e: any) => e.idx === 0);
 
-      await client.execute({
-        sql: "INSERT INTO `__drizzle_migrations` (hash, created_at) VALUES (?, ?)",
-        args: [hash, baseEntry.when]
-      });
-      console.log(`Baselined ${baseEntry.tag} successfully with hash ${hash}.`);
-    } else {
-      throw new Error("Initial migration entry not found in journal.");
+      if (baseEntry) {
+        const sqlFileName = `${baseEntry.tag}.sql`;
+        const sqlPath = path.join(migrationsDir, sqlFileName);
+        const sqlContent = fs.readFileSync(sqlPath, "utf-8");
+        
+        // Drizzle ORM calculates hash on the exact content of the file
+        const hash = crypto.createHash("sha256").update(sqlContent).digest("hex");
+
+        await client.execute({
+          sql: "INSERT INTO `__drizzle_migrations` (hash, created_at) VALUES (?, ?)",
+          args: [hash, baseEntry.when]
+        });
+        console.log(`Baselined ${baseEntry.tag} successfully with hash ${hash}.`);
+      } else {
+        throw new Error("Initial migration entry not found in journal.");
+      }
     }
   }
 
