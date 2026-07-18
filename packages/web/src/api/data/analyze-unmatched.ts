@@ -17,7 +17,7 @@ interface MachineMaster {
   competingMachines: string[];
 }
 
-// 16 Popular machines carefully verified for official specifications and avoiding version-crossing aliases
+// 精密に設計した20機種の機種マスタリスト（バージョン間の競合・Substringの被りを徹底回避）
 const machinesMasterList: MachineMaster[] = [
   {
     name: "eフィーバー　シン・エヴァンゲリオン　Type レイ",
@@ -46,6 +46,19 @@ const machinesMasterList: MachineMaster[] = [
     competingMachines: ["P真・北斗無双 第4章", "スマスロ 北斗の拳 転生の章2"]
   },
   {
+    name: "スマスロ 北斗の拳 転生の章2",
+    maker: "サミー",
+    type: "slot",
+    releaseDate: "2026-01-05",
+    officialUrl: "https://www.sammy.co.jp/",
+    sourceUrl: "https://www.p-world.co.jp/machine/database/10398",
+    verified: true,
+    uniqueAliases: ["スマスロ北斗の拳 転生の章2", "北斗の拳 転生の章2", "北斗転生2", "転生の章2", "北斗転生の章2"],
+    ambiguousAliases: ["北斗", "北斗の拳"],
+    resolvingSubKeywords: ["転生2", "あべし", "闘神演舞", "神拳勝舞", "勝舞魂"],
+    competingMachines: ["スマスロ北斗の拳"]
+  },
+  {
     name: "パチスロ甲鉄城のカバネリ",
     maker: "サミー",
     type: "slot",
@@ -56,7 +69,20 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["カバネリ 6.5", "6.5号機カバネリ", "カバネリ美馬", "カバネリ無名"],
     ambiguousAliases: ["カバネリ", "甲鉄城のカバネリ"],
     resolvingSubKeywords: ["美馬", "無名", "さらば諭吉", "裏美馬", "ST"],
-    competingMachines: ["甲鉄城のカバネリ 海門決戦"]
+    competingMachines: ["スマスロ 甲鉄城のカバネリ 海門決戦"]
+  },
+  {
+    name: "スマスロ 甲鉄城のカバネリ 海門決戦",
+    maker: "サミー",
+    type: "slot",
+    releaseDate: "2026-03-02",
+    officialUrl: "https://www.sammy.co.jp/",
+    sourceUrl: "https://www.p-world.co.jp/machine/database/10411",
+    verified: true,
+    uniqueAliases: ["スマスロ甲鉄城のカバネリ 海門決戦", "カバネリ 海門決戦", "カバネリ海門決戦", "カバネリ2", "海門決戦"],
+    ambiguousAliases: ["カバネリ", "甲鉄城のカバネリ"],
+    resolvingSubKeywords: ["海門", "うなと", "決戦"],
+    competingMachines: ["パチスロ甲鉄城のカバネリ"]
   },
   {
     name: "L戦国乙女4 戦乱に閃く炯眼の軍師",
@@ -69,7 +95,20 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["戦国乙女4", "乙女4", "L戦国乙女4", "L戦国乙女4 戦乱に閃く炯眼の軍師"],
     ambiguousAliases: ["戦国乙女", "乙女"],
     resolvingSubKeywords: ["乙女4", "4", "ヨシテル", "ムサシ", "炯眼"],
-    competingMachines: ["L戦国乙女5 業火を穿つ宿怨 of 敢戦の双刃"]
+    competingMachines: ["L戦国乙女5 業火を穿つ宿焔の双刃"]
+  },
+  {
+    name: "L戦国乙女5 業火を穿つ宿焔 of 敢戦の双刃",
+    maker: "オリンピア",
+    type: "slot",
+    releaseDate: "2026-06-08",
+    officialUrl: "https://www.heiwanet.co.jp/",
+    sourceUrl: "https://www.p-world.co.jp/machine/database/10432",
+    verified: true,
+    uniqueAliases: ["L戦国乙女5 業火を穿つ宿焔の双刃", "戦国乙女5", "乙女5", "L戦国乙女5"],
+    ambiguousAliases: ["戦国乙女", "乙女"],
+    resolvingSubKeywords: ["5", "宿焔", "石川ゴエモン", "強カワRUSH", "本能寺の変"],
+    competingMachines: ["L戦国乙女4 戦乱に閃く炯眼の軍師"]
   },
   {
     name: "P大海物語5",
@@ -82,7 +121,33 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["大海物語5", "大海5"],
     ambiguousAliases: ["大海", "大海物語"],
     resolvingSubKeywords: ["5", "マリン", "パール", "スペシャル", "SP"],
-    competingMachines: ["PAスーパー海物語 IN 沖縄6", "P大海物語5スペシャル", "大海4"]
+    competingMachines: ["PAスーパー海物語 IN 沖縄6", "P大海物語5スペシャル", "P大海物語5 ブラック", "大海4"]
+  },
+  {
+    name: "P大海物語5 ブラック",
+    maker: "三洋物産",
+    type: "pachinko",
+    releaseDate: "2023-12-04",
+    officialUrl: "https://www.sanyobussan.co.jp/",
+    sourceUrl: "https://www.p-world.co.jp/machine/database/9895",
+    verified: true,
+    uniqueAliases: ["大海物語5 ブラック", "大海5 ブラック", "大海5ブラック"],
+    ambiguousAliases: ["大海", "大海物語"],
+    resolvingSubKeywords: ["ブラック", "199", "黒海"],
+    competingMachines: ["P大海物語5"]
+  },
+  {
+    name: "P大海物語5スペシャル",
+    maker: "三洋物産",
+    type: "pachinko",
+    releaseDate: "2024-11-05",
+    officialUrl: "https://www.sanyobussan.co.jp/products/pk_ooumi5_special/",
+    sourceUrl: "https://www.p-world.co.jp/machine/database/10185",
+    verified: true,
+    uniqueAliases: ["大海物語5スペシャル", "大海5スペシャル", "大海5SP", "大海物語5SP"],
+    ambiguousAliases: ["大海", "大海物語"],
+    resolvingSubKeywords: ["スペシャル", "SP"],
+    competingMachines: ["P大海物語5"]
   },
   {
     name: "パチスロ からくりサーカス",
@@ -446,7 +511,7 @@ async function analyze() {
 
 ---
 
-## 🎯 新マスタ候補とエイリアス分類 (全16機種)
+## 🎯 新マスタ候補とエイリアス分類 (全21機種)
 
 | 順位 | 正式名称 | メーカー | タイプ | 導入年月 | 推奨 uniqueAliases | 推奨 ambiguousAliases | 競合別機種 | 想定一致数 | 保留数 | 公式検証 | 情報源URL |
 | :---: | :--- | :--- | :---: | :---: | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
