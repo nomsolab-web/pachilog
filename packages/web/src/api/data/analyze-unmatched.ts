@@ -274,10 +274,10 @@ ${m.samples.map((s) => `- \`${s}\``).join("\n")}
   if (reportPath) {
     fs.writeFileSync(reportPath, markdownReport, "utf-8");
     console.log(`Markdown report written to GITHUB_STEP_SUMMARY: ${reportPath}`);
-  } else {
-    console.log("GITHUB_STEP_SUMMARY environment variable not set. Report output to stdout:\n");
-    console.log(markdownReport);
   }
+  console.log("--- REPORT START ---");
+  console.log(markdownReport);
+  console.log("--- REPORT END ---");
 }
 
 analyze()
