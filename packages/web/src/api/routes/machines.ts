@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machineVotes, machines, videoSnapshots, videoMachineLinks, videos as videosTable } from "../database/schema";
+import { channels, machineMentions, machineVotes, machines, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
 
 export const machinesRoute = new Hono()
@@ -160,60 +160,4 @@ export const machinesRoute = new Hono()
     }
 
     return c.json({ ok: true }, 200);
-  })
-  .get("/debug/db-stats", async (c) => {
-    const totalMachines = await db.select().from(machines);
-    const matchedCount = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "matched"));
-    const manualCount = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual"));
-    const unmatchedCount = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "unmatched"));
-    const manualExcludedCount = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual_excluded"));
-    
-    const manualLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.matchMethod, "manual"));
-    const manualExcludedLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.matchMethod, "manual_excluded"));
-    
-    const allLinks = await db
-      .select({
-        id: videoMachineLinks.id,
-        videoId: videoMachineLinks.videoId,
-        machineName: machines.name,
-        matchMethod: videoMachineLinks.matchMethod,
-      })
-      .from(videoMachineLinks)
-      .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id));
-    
-    return c.json({
-      machinesCount: totalMachines.length,
-      matchedVideosCount: matchedCount.length,
-      manualVideosCount: manualCount.length,
-      unmatchedVideosCount: unmatchedCount.length,
-      manualExcludedVideosCount: manualExcludedCount.length,
-      manualLinksCount: manualLinks.length,
-      manualExcludedCount: manualExcludedLinks.length,
-      allLinks,
-    }, 200);
-  })
-  .get("/debug/db-raw", async (c) => {
-    const links = await db.select().from(videoMachineLinks);
-    const mentions = await db.select().from(machineMentions);
-    const vPending = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "pending"));
-    const vMatched = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "matched"));
-    const vUnmatched = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "unmatched"));
-    const vManual = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual"));
-    const vExcluded = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual_excluded"));
-    
-    return c.json({
-      links,
-      mentions,
-      pendingCount: vPending.length,
-      matchedCount: vMatched.length,
-      unmatchedCount: vUnmatched.length,
-      manualCount: vManual.length,
-      excludedCount: vExcluded.length,
-    }, 200);
-  })
-  .get("/debug/db-env", async (c) => {
-    const url = process.env.DATABASE_URL || "NOT_SET";
-    const token = process.env.DATABASE_AUTH_TOKEN || "NOT_SET";
-    const maskedToken = token !== "NOT_SET" ? token.slice(0, 8) + "..." : "NOT_SET";
-    return c.json({ url, token: maskedToken }, 200);
   });
