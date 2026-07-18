@@ -371,6 +371,7 @@ async function analyze() {
       verified: m.verified,
       uniqueAliases: m.uniqueAliases,
       ambiguousAliases: m.ambiguousAliases,
+      resolvingSubKeywords: m.resolvingSubKeywords,
       competingMachines: m.competingMachines,
       matchedCount: totalMatched,
       ambiguousCount: ambig.length,
