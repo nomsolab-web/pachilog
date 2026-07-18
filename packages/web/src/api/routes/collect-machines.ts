@@ -64,25 +64,56 @@ export const collectMachines = new Hono().post("/run", async (c) => {
       const stats = await fetchVideoStats([...new Set(videos.map((video) => video.videoId))]);
       results.youtubeVideoStatCalls += Math.ceil(new Set(videos.map((video) => video.videoId)).size / 50);
       const statsMap = new Map(stats.map((s) => [s.videoId, s]));
+      const videoIds = videos.map((v) => v.videoId);
+
+      // 1. Fetch all existing videos for these video IDs in a single batch query
+      const existingVideos = await db
+        .select()
+        .from(videosTable)
+        .where(inArray(videosTable.videoId, videoIds));
+      const existingVideosMap = new Map(existingVideos.map((v) => [v.videoId, v]));
+
+      // 2. Fetch all existing snapshots for these video IDs and this date in a single batch query
+      const existingSnapshots = await db
+        .select()
+        .from(videoSnapshots)
+        .where(
+          and(
+            inArray(videoSnapshots.videoId, videoIds),
+            eq(videoSnapshots.date, date)
+          )
+        );
+      const existingSnapshotsMap = new Map(existingSnapshots.map((s) => [s.videoId, s]));
+
       for (const video of videos) {
         const stat = statsMap.get(video.videoId);
         if (!stat) continue;
 
-        const existingVideo = await db.select().from(videosTable).where(eq(videosTable.videoId, video.videoId));
-        if (existingVideo.length > 0) {
-          await db
-            .update(videosTable)
-            .set({
-              channelId: ch.id,
-              title: video.title,
-              thumbnailUrl: video.thumbnailUrl,
-              publishedAt: video.publishedAt,
-              viewCount: stat.viewCount,
-              likeCount: stat.likeCount,
-              commentCount: stat.commentCount,
-              updatedAt: new Date(),
-            })
-            .where(eq(videosTable.id, existingVideo[0].id));
+        const existingVideo = existingVideosMap.get(video.videoId);
+        if (existingVideo) {
+          // Only update if stats or basic fields changed to avoid unnecessary writes
+          const needsUpdate =
+            existingVideo.title !== video.title ||
+            existingVideo.thumbnailUrl !== video.thumbnailUrl ||
+            existingVideo.viewCount !== stat.viewCount ||
+            existingVideo.likeCount !== stat.likeCount ||
+            existingVideo.commentCount !== stat.commentCount;
+
+          if (needsUpdate) {
+            await db
+              .update(videosTable)
+              .set({
+                channelId: ch.id,
+                title: video.title,
+                thumbnailUrl: video.thumbnailUrl,
+                publishedAt: video.publishedAt,
+                viewCount: stat.viewCount,
+                likeCount: stat.likeCount,
+                commentCount: stat.commentCount,
+                updatedAt: new Date(),
+              })
+              .where(eq(videosTable.id, existingVideo.id));
+          }
         } else {
           await db.insert(videosTable).values({
             videoId: video.videoId,
@@ -97,11 +128,8 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         }
         results.videosUpserted += 1;
 
-        const existingSnapshot = await db
-          .select()
-          .from(videoSnapshots)
-          .where(and(eq(videoSnapshots.videoId, video.videoId), eq(videoSnapshots.date, date)));
-        if (existingSnapshot.length > 0) {
+        const existingSnapshot = existingSnapshotsMap.get(video.videoId);
+        if (existingSnapshot) {
           results.videoSnapshotsSkippedExisting += 1;
         } else {
           await db.insert(videoSnapshots).values({
@@ -115,14 +143,8 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         }
       }
 
-      const videoIds = videos.map((v) => v.videoId);
-
-      // 1. Fetch all existing videos for this channel's video IDs in a single batch query
-      const dbVideos = await db
-        .select()
-        .from(videosTable)
-        .where(inArray(videosTable.videoId, videoIds));
-      const dbVideosMap = new Map(dbVideos.map((v) => [v.videoId, v]));
+      // 1. Fetch all existing videos for this channel's video IDs in a single batch query (re-use map populated above)
+      const dbVideosMap = existingVideosMap;
 
       // 2. Fetch all existing videoMachineLinks for all these video IDs in a single batch query
       const existingLinks = await db
