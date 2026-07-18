@@ -191,4 +191,23 @@ export const machinesRoute = new Hono()
       manualExcludedCount: manualExcludedLinks.length,
       allLinks,
     }, 200);
+  })
+  .get("/debug/db-raw", async (c) => {
+    const links = await db.select().from(videoMachineLinks);
+    const mentions = await db.select().from(machineMentions);
+    const vPending = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "pending"));
+    const vMatched = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "matched"));
+    const vUnmatched = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "unmatched"));
+    const vManual = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual"));
+    const vExcluded = await db.select().from(videosTable).where(eq(videosTable.matchStatus, "manual_excluded"));
+    
+    return c.json({
+      links,
+      mentions,
+      pendingCount: vPending.length,
+      matchedCount: vMatched.length,
+      unmatchedCount: vUnmatched.length,
+      manualCount: vManual.length,
+      excludedCount: vExcluded.length,
+    }, 200);
   });
