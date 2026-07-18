@@ -171,6 +171,16 @@ export const machinesRoute = new Hono()
     const manualLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.matchMethod, "manual"));
     const manualExcludedLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.matchMethod, "manual_excluded"));
     
+    const allLinks = await db
+      .select({
+        id: videoMachineLinks.id,
+        videoId: videoMachineLinks.videoId,
+        machineName: machines.name,
+        matchMethod: videoMachineLinks.matchMethod,
+      })
+      .from(videoMachineLinks)
+      .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id));
+    
     return c.json({
       machinesCount: totalMachines.length,
       matchedVideosCount: matchedCount.length,
@@ -179,5 +189,6 @@ export const machinesRoute = new Hono()
       manualExcludedVideosCount: manualExcludedCount.length,
       manualLinksCount: manualLinks.length,
       manualExcludedCount: manualExcludedLinks.length,
+      allLinks,
     }, 200);
   });
