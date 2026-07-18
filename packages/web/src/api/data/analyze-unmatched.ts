@@ -17,7 +17,7 @@ interface MachineMaster {
   competingMachines: string[];
 }
 
-// 25 Popular machines carefully verified for official specifications and avoiding version-crossing aliases
+// 16 Popular machines carefully verified for official specifications and avoiding version-crossing aliases
 const machinesMasterList: MachineMaster[] = [
   {
     name: "eフィーバー　シン・エヴァンゲリオン　Type レイ",
@@ -43,7 +43,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["スマスロ北斗", "スマスロ北斗の拳", "L北斗の拳", "L北斗"],
     ambiguousAliases: ["北斗", "北斗の拳"],
     resolvingSubKeywords: ["スマスロ", "本前兆", "宿命", "北斗揃い", "無双転生"],
-    competingMachines: ["P真・北斗無双 第4章"]
+    competingMachines: ["P真・北斗無双 第4章", "スマスロ 北斗の拳 転生の章2"]
   },
   {
     name: "パチスロ甲鉄城のカバネリ",
@@ -82,7 +82,7 @@ const machinesMasterList: MachineMaster[] = [
     uniqueAliases: ["大海物語5", "大海5"],
     ambiguousAliases: ["大海", "大海物語"],
     resolvingSubKeywords: ["5", "マリン", "パール", "スペシャル", "SP"],
-    competingMachines: ["PAスーパー海物語 IN 沖縄6", "P大海物語5スペシャル"]
+    competingMachines: ["PAスーパー海物語 IN 沖縄6", "P大海物語5スペシャル", "大海4"]
   },
   {
     name: "パチスロ からくりサーカス",
@@ -281,9 +281,30 @@ async function analyze() {
       // 1. Check unique aliases
       let isUniqueMatch = false;
       for (const ua of m.uniqueAliases) {
-        if (titleNorm.includes(normalizeText(ua))) {
-          isUniqueMatch = true;
-          break;
+        const normUa = normalizeText(ua);
+        if (titleNorm.includes(normUa)) {
+          // Check for substring overlap with longer aliases of other machines
+          let isSubstringOfLongerAlias = false;
+          for (const otherM of machinesMasterList) {
+            const allOtherAliases = [...otherM.uniqueAliases, ...otherM.ambiguousAliases];
+            for (const otherAlias of allOtherAliases) {
+              const normOther = normalizeText(otherAlias);
+              if (
+                normOther.length > normUa.length &&
+                normOther.includes(normUa) &&
+                titleNorm.includes(normOther)
+              ) {
+                isSubstringOfLongerAlias = true;
+                break;
+              }
+            }
+            if (isSubstringOfLongerAlias) break;
+          }
+
+          if (!isSubstringOfLongerAlias) {
+            isUniqueMatch = true;
+            break;
+          }
         }
       }
 
@@ -295,10 +316,33 @@ async function analyze() {
 
       // 2. Check ambiguous aliases + resolving sub-keywords
       let hasAmbiguousAlias = false;
+      let matchedAmbiguousText = "";
       for (const aa of m.ambiguousAliases) {
-        if (titleNorm.includes(normalizeText(aa))) {
-          hasAmbiguousAlias = true;
-          break;
+        const normAa = normalizeText(aa);
+        if (titleNorm.includes(normAa)) {
+          // Check for substring overlap with longer aliases of other machines
+          let isSubstringOfLongerAlias = false;
+          for (const otherM of machinesMasterList) {
+            const allOtherAliases = [...otherM.uniqueAliases, ...otherM.ambiguousAliases];
+            for (const otherAlias of allOtherAliases) {
+              const normOther = normalizeText(otherAlias);
+              if (
+                normOther.length > normAa.length &&
+                normOther.includes(normAa) &&
+                titleNorm.includes(normOther)
+              ) {
+                isSubstringOfLongerAlias = true;
+                break;
+              }
+            }
+            if (isSubstringOfLongerAlias) break;
+          }
+
+          if (!isSubstringOfLongerAlias) {
+            hasAmbiguousAlias = true;
+            matchedAmbiguousText = normAa;
+            break;
+          }
         }
       }
 
@@ -346,8 +390,7 @@ async function analyze() {
       samples.push(matches[i]);
     }
 
-    // Since this is read-only, we estimate precision assuming 100% target accuracy for unique + sub-resolved aliases
-    // Let's count potential false positives (e.g. if the title contains a competing machine word)
+    // Evaluate precision based on checking version conflicts in the matched titles
     let potentialErrors = 0;
     for (const sample of samples) {
       const sampleNorm = normalizeText(sample);
