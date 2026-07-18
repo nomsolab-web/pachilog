@@ -115,12 +115,33 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         }
       }
 
+      const videoIds = videos.map((v) => v.videoId);
+
+      // 1. Fetch all existing videos for this channel's video IDs in a single batch query
+      const dbVideos = await db
+        .select()
+        .from(videosTable)
+        .where(inArray(videosTable.videoId, videoIds));
+      const dbVideosMap = new Map(dbVideos.map((v) => [v.videoId, v]));
+
+      // 2. Fetch all existing videoMachineLinks for all these video IDs in a single batch query
+      const existingLinks = await db
+        .select()
+        .from(videoMachineLinks)
+        .where(inArray(videoMachineLinks.videoId, videoIds));
+
+      const linksByVideoId = new Map<string, typeof videoMachineLinks.$inferSelect[]>();
+      for (const link of existingLinks) {
+        const list = linksByVideoId.get(link.videoId) || [];
+        list.push(link);
+        linksByVideoId.set(link.videoId, list);
+      }
+
       for (const video of videos) {
         const stat = statsMap.get(video.videoId);
         if (!stat) continue;
 
-        // Fetch existing video record to check matchStatus
-        const [dbVideo] = await db.select().from(videosTable).where(eq(videosTable.videoId, video.videoId));
+        const dbVideo = dbVideosMap.get(video.videoId);
         
         // If it is manually matched or manual_excluded, DO NOT run auto matching
         if (dbVideo && (dbVideo.matchStatus === "manual" || dbVideo.matchStatus === "manual_excluded")) {
@@ -130,17 +151,14 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         // Run detailed matching logic
         const autoMatches = findDetailedMachineMatches(video.title, machineList);
 
-        // Fetch existing links for this video to keep manual ones
-        const existingLinks = await db
-          .select()
-          .from(videoMachineLinks)
-          .where(eq(videoMachineLinks.videoId, video.videoId));
-
-        const manualLinks = existingLinks.filter(l => l.matchMethod === "manual" || l.matchMethod === "manual_excluded");
+        // Filter existing links for this video
+        const videoLinks = linksByVideoId.get(video.videoId) || [];
+        const manualLinks = videoLinks.filter(l => l.matchMethod === "manual" || l.matchMethod === "manual_excluded");
         const manualMachineIds = new Set(manualLinks.map(l => l.machineId));
 
         // Delete all old auto-matched links
-        if (existingLinks.some(l => ["exact_name", "alias"].includes(l.matchMethod))) {
+        const hasAutoMatches = videoLinks.some(l => ["exact_name", "alias"].includes(l.matchMethod));
+        if (hasAutoMatches) {
           await db
             .delete(videoMachineLinks)
             .where(
@@ -163,52 +181,60 @@ export const collectMachines = new Hono().post("/run", async (c) => {
           });
         }
 
-        // Determine final match status
-        const activeLinks = await db
-          .select()
-          .from(videoMachineLinks)
-          .where(eq(videoMachineLinks.videoId, video.videoId));
+        // Determine final active links (re-query only if we changed them, otherwise use local union)
+        let activeLinks = videoLinks;
+        if (hasAutoMatches || newLinksToInsert.length > 0) {
+          activeLinks = await db
+            .select()
+            .from(videoMachineLinks)
+            .where(eq(videoMachineLinks.videoId, video.videoId));
+        }
 
         // Note: manual_excluded links are not counted as active "matched" machines
         const hasMatchedMachines = activeLinks.some(l => l.matchMethod !== "manual_excluded");
-
         const finalStatus = hasMatchedMachines ? "matched" : "unmatched";
-        await db
-          .update(videosTable)
-          .set({ matchStatus: finalStatus, updatedAt: new Date() })
-          .where(eq(videosTable.videoId, video.videoId));
+
+        // Only update videos table if final status is different from current status
+        const currentStatus = dbVideo ? dbVideo.matchStatus : "pending";
+        if (finalStatus !== currentStatus) {
+          await db
+            .update(videosTable)
+            .set({ matchStatus: finalStatus, updatedAt: new Date() })
+            .where(eq(videosTable.videoId, video.videoId));
+        }
 
         // Rebuild machine_mentions cache for this video
-        await db.delete(machineMentions).where(eq(machineMentions.videoId, video.videoId));
+        const mentionActiveLinks = activeLinks.filter(l => l.matchMethod !== "manual_excluded");
+        if (hasAutoMatches || newLinksToInsert.length > 0 || (dbVideo && dbVideo.matchStatus !== finalStatus)) {
+          await db.delete(machineMentions).where(eq(machineMentions.videoId, video.videoId));
 
-        for (const link of activeLinks) {
-          if (link.matchMethod === "manual_excluded") continue; // Exclude manually unlinked ones from public view
-          
-          await db.insert(machineMentions).values({
-            machineId: link.machineId,
-            channelId: ch.id,
-            videoId: video.videoId,
-            videoTitle: video.title,
-            viewCount: stat.viewCount,
-            likeCount: stat.likeCount,
-            commentCount: stat.commentCount,
-            publishedAt: video.publishedAt,
-          });
-          results.mentionsUpserted += 1;
+          for (const link of mentionActiveLinks) {
+            await db.insert(machineMentions).values({
+              machineId: link.machineId,
+              channelId: ch.id,
+              videoId: video.videoId,
+              videoTitle: video.title,
+              viewCount: stat.viewCount,
+              likeCount: stat.likeCount,
+              commentCount: stat.commentCount,
+              publishedAt: video.publishedAt,
+            });
+            results.mentionsUpserted += 1;
+          }
         }
       }
 
       // Populate aiCandidates for videos that remain unmatched
-      const allActiveLinks = await db
+      const currentActiveLinks = await db
         .select()
         .from(videoMachineLinks)
         .where(
           and(
-            inArray(videoMachineLinks.videoId, videos.map((v) => v.videoId)),
+            inArray(videoMachineLinks.videoId, videoIds),
             inArray(videoMachineLinks.matchMethod, ["manual", "exact_name", "alias"])
           )
         );
-      const matchedVideoIds = new Set(allActiveLinks.map((l) => l.videoId));
+      const matchedVideoIds = new Set(currentActiveLinks.map((l) => l.videoId));
       
       aiCandidates.push(
         ...buildAiCandidates(
