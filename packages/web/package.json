@@ -17,7 +17,8 @@
     "db:push": "bun --env-file=../../.env drizzle-kit push",
     "db:studio": "bun --env-file=../../.env drizzle-kit studio",
     "admin-cli": "bun --env-file=../../.env src/api/data/admin-cli.ts",
-    "db:analyze": "bun --env-file=../../.env src/api/data/analyze-unmatched.ts"
+    "db:analyze": "bun --env-file=../../.env src/api/data/analyze-unmatched.ts",
+    "db:rehearsal": "bun --env-file=../../.env src/api/data/run-db-rehearsal.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

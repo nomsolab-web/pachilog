@@ -15,6 +15,20 @@
       "when": 1784367343376,
       "tag": "0001_striped_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784394915675,
+      "tag": "0002_rapid_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784394951270,
+      "tag": "0003_flashy_kree",
+      "breakpoints": true
     }
   ]
 }

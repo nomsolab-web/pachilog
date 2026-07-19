@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
 /**
  * You can write your custom database schema here.
@@ -50,7 +50,7 @@ export const videos = sqliteTable("videos", {
   viewCount: integer("view_count").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),
-  matchStatus: text("match_status", { enum: ["pending", "matched", "unmatched", "manual_excluded"] })
+  matchStatus: text("match_status", { enum: ["pending", "matched", "unmatched", "manual", "manual_excluded"] })
     .notNull()
     .default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -94,6 +94,9 @@ export const machines = sqliteTable("machines", {
   name: text("name").notNull(),
   shortName: text("short_name"),
   aliases: text("aliases", { mode: "json" }).$type<string[]>(),
+  uniqueAliases: text("unique_aliases", { mode: "json" }).$type<string[]>(),
+  ambiguousAliases: text("ambiguous_aliases", { mode: "json" }).$type<string[]>(),
+  resolvingKeywords: text("resolving_keywords", { mode: "json" }).$type<string[]>(),
   excludeTerms: text("exclude_terms", { mode: "json" }).$type<string[]>(),
   type: text("type"),
   maker: text("maker"),
@@ -202,4 +205,36 @@ export const videoMachineLinks = sqliteTable(
       .$defaultFn(() => new Date()),
   },
   (table) => [uniqueIndex("video_machine_link_idx").on(table.videoId, table.machineId)],
+);
+
+export const ambiguousVideoLinks = sqliteTable(
+  "ambiguous_video_links",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    videoId: text("video_id")
+      .notNull()
+      .references(() => videos.videoId, { onDelete: "cascade" }),
+    candidateMachineId: integer("candidate_machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    matchedTerms: text("matched_terms", { mode: "json" }).$type<string[]>().notNull(),
+    confidence: integer("confidence").notNull().default(50),
+    reason: text("reason"),
+    reviewStatus: text("review_status", { enum: ["pending", "approved", "rejected"] })
+      .notNull()
+      .default("pending"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
+  },
+  (table) => [
+    uniqueIndex("ambiguous_video_link_idx").on(table.videoId, table.candidateMachineId),
+    index("ambiguous_video_id_idx").on(table.videoId),
+    index("ambiguous_machine_id_idx").on(table.candidateMachineId),
+    index("ambiguous_review_status_idx").on(table.reviewStatus),
+  ]
 );

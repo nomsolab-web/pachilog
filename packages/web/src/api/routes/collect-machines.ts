@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "../database";
-import { channels, machineMentions, machines, videos as videosTable, videoSnapshots, videoMachineLinks } from "../database/schema";
+import { channels, machineMentions, machines, videos as videosTable, videoSnapshots, videoMachineLinks, ambiguousVideoLinks } from "../database/schema";
 import { dateStringInTimeZone } from "../lib/date";
 import {
   fetchRecentVideos,
@@ -10,7 +10,7 @@ import {
   isSuccessfulCollectionRate,
   mapWithConcurrency,
 } from "../lib/youtube";
-import { findDetailedMachineMatches } from "../lib/machine-match";
+import { findDetailedMachineMatches, findAmbiguousDetailedMatches } from "../lib/machine-match";
 import { buildAiCandidates, runAiMachineJudgments, type AiCandidate } from "../lib/machine-ai";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
@@ -159,6 +159,19 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         linksByVideoId.set(link.videoId, list);
       }
 
+      // 3. Fetch all existing ambiguousVideoLinks for all these video IDs
+      const existingAmbiguousLinks = await db
+        .select()
+        .from(ambiguousVideoLinks)
+        .where(inArray(ambiguousVideoLinks.videoId, videoIds));
+
+      const ambLinksByVideoId = new Map<string, typeof ambiguousVideoLinks.$inferSelect[]>();
+      for (const link of existingAmbiguousLinks) {
+        const list = ambLinksByVideoId.get(link.videoId) || [];
+        list.push(link);
+        ambLinksByVideoId.set(link.videoId, list);
+      }
+
       for (const video of videos) {
         const stat = statsMap.get(video.videoId);
         if (!stat) continue;
@@ -201,6 +214,52 @@ export const collectMachines = new Hono().post("/run", async (c) => {
             matchConfidence: link.matchConfidence,
             matchMethod: link.matchMethod,
           });
+        }
+
+        // Run ambiguous matching logic
+        const autoAmbMatches = findAmbiguousDetailedMatches(video.title, machineList);
+
+        // Fetch existing ambiguous links for this video
+        const videoAmbLinks = ambLinksByVideoId.get(video.videoId) || [];
+        const videoAmbMap = new Map(videoAmbLinks.map(l => [l.candidateMachineId, l]));
+
+        // Process ambiguous matches
+        const activeAmbMachineIds = new Set(autoAmbMatches.map(m => m.machineId));
+
+        // 1. Delete old pending ambiguous links that are no longer matched
+        for (const link of videoAmbLinks) {
+          if (link.reviewStatus === "pending" && !activeAmbMachineIds.has(link.candidateMachineId)) {
+            await db
+              .delete(ambiguousVideoLinks)
+              .where(eq(ambiguousVideoLinks.id, link.id));
+          }
+        }
+
+        // 2. Insert or update ambiguous matches
+        for (const match of autoAmbMatches) {
+          const existingAmb = videoAmbMap.get(match.machineId);
+          if (existingAmb) {
+            if (existingAmb.reviewStatus === "pending") {
+              await db
+                .update(ambiguousVideoLinks)
+                .set({
+                  matchedTerms: match.matchedTerms,
+                  confidence: match.confidence,
+                  reason: match.reason,
+                  updatedAt: new Date(),
+                })
+                .where(eq(ambiguousVideoLinks.id, existingAmb.id));
+            }
+          } else {
+            await db.insert(ambiguousVideoLinks).values({
+              videoId: video.videoId,
+              candidateMachineId: match.machineId,
+              matchedTerms: match.matchedTerms,
+              confidence: match.confidence,
+              reason: match.reason,
+              reviewStatus: "pending",
+            });
+          }
         }
 
         // Determine final active links (re-query only if we changed them, otherwise use local union)
