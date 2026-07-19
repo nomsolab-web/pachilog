@@ -97,16 +97,25 @@ async function runRehearsal() {
   }
 
   // 2. Record Pre-Migration Table Counts
+  async function countRows(tableName: string): Promise<number> {
+    try {
+      const res = await rehearsalClient.execute(`SELECT COUNT(*) as c FROM ${tableName}`);
+      return Number(res.rows[0]?.c ?? 0);
+    } catch {
+      return 0;
+    }
+  }
+
   const preCounts = {
-    channels: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channels))[0].c as number,
-    channelSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channelSnapshots))[0].c as number,
-    videos: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videos))[0].c as number,
-    videoSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoSnapshots))[0].c as number,
-    machines: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machines))[0].c as number,
-    machineMentions: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machineMentions))[0].c as number,
-    videoMachineLinks: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoMachineLinks))[0].c as number,
-    ambiguousVideoLinks: 0,
-    drizzleMigrations: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.drizzleMigrations))[0].c as number,
+    channels: await countRows("channels"),
+    channelSnapshots: await countRows("channel_snapshots"),
+    videos: await countRows("videos"),
+    videoSnapshots: await countRows("video_snapshots"),
+    machines: await countRows("machines"),
+    machineMentions: await countRows("machine_mentions"),
+    videoMachineLinks: await countRows("video_machine_links"),
+    ambiguousVideoLinks: await countRows("ambiguous_video_links"),
+    drizzleMigrations: await countRows("_drizzle_migrations"),
   };
 
   console.log("\n--- PRE-REHEARSAL TABLE COUNTS ---");
@@ -219,7 +228,7 @@ async function runRehearsal() {
     else dryUnmatched++;
   }
 
-  const postDryRunLinksCount = (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoMachineLinks))[0].c as number;
+  const postDryRunLinksCount = await countRows("video_machine_links");
   console.log(`[Dry-Run Verify] Links Count After Dry-Run: ${postDryRunLinksCount} (Must equal preLinks: ${preCounts.videoMachineLinks})`);
   console.log(`[Dry-Run Simulation] Matched Videos: ${dryMatched}, Ambiguous: ${dryAmbiguous}, Unmatched: ${dryUnmatched}`);
 
@@ -291,15 +300,15 @@ async function runRehearsal() {
 
   // Record Post-Rematch Counts (Run #1)
   const postCountsRun1 = {
-    channels: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channels))[0].c as number,
-    channelSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channelSnapshots))[0].c as number,
-    videos: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videos))[0].c as number,
-    videoSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoSnapshots))[0].c as number,
-    machines: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machines))[0].c as number,
-    machineMentions: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machineMentions))[0].c as number,
-    videoMachineLinks: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoMachineLinks))[0].c as number,
-    ambiguousVideoLinks: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.ambiguousVideoLinks))[0].c as number,
-    drizzleMigrations: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.drizzleMigrations))[0].c as number,
+    channels: await countRows("channels"),
+    channelSnapshots: await countRows("channel_snapshots"),
+    videos: await countRows("videos"),
+    videoSnapshots: await countRows("video_snapshots"),
+    machines: await countRows("machines"),
+    machineMentions: await countRows("machine_mentions"),
+    videoMachineLinks: await countRows("video_machine_links"),
+    ambiguousVideoLinks: await countRows("ambiguous_video_links"),
+    drizzleMigrations: await countRows("_drizzle_migrations"),
   };
 
   console.log("\n--- POST-REMATCH TABLE COUNTS (RUN #1) ---");
@@ -399,15 +408,15 @@ async function runRehearsal() {
   });
 
   const postCountsRun2 = {
-    channels: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channels))[0].c as number,
-    channelSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.channelSnapshots))[0].c as number,
-    videos: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videos))[0].c as number,
-    videoSnapshots: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoSnapshots))[0].c as number,
-    machines: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machines))[0].c as number,
-    machineMentions: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.machineMentions))[0].c as number,
-    videoMachineLinks: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.videoMachineLinks))[0].c as number,
-    ambiguousVideoLinks: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.ambiguousVideoLinks))[0].c as number,
-    drizzleMigrations: (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.drizzleMigrations))[0].c as number,
+    channels: await countRows("channels"),
+    channelSnapshots: await countRows("channel_snapshots"),
+    videos: await countRows("videos"),
+    videoSnapshots: await countRows("video_snapshots"),
+    machines: await countRows("machines"),
+    machineMentions: await countRows("machine_mentions"),
+    videoMachineLinks: await countRows("video_machine_links"),
+    ambiguousVideoLinks: await countRows("ambiguous_video_links"),
+    drizzleMigrations: await countRows("_drizzle_migrations"),
   };
 
   console.log("\n--- POST-REMATCH TABLE COUNTS (RUN #2 - IDEMPOTENCY) ---");
