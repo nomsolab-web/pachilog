@@ -71,6 +71,14 @@ async function runRehearsal() {
     if (trimmed) await rehearsalClient.execute(trimmed);
   }
 
+  await rehearsalClient.execute(`
+    CREATE TABLE IF NOT EXISTS _drizzle_migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash TEXT NOT NULL,
+      created_at INTEGER
+    );
+  `);
+
   console.log("Copying production snapshot data into Rehearsal DB...");
   const copyTables = [
     "channels",
