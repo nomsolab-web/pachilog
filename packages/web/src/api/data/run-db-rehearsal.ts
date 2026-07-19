@@ -148,7 +148,7 @@ async function runRehearsal() {
     INSERT INTO _drizzle_migrations (hash, created_at) VALUES ('0003_flashy_kree', ${Date.now()});
   `);
 
-  const postMigDrizzleCount = (await rehearsalDb.select({ c: sql`COUNT(*)` }).from(schema.drizzleMigrations))[0].c as number;
+  const postMigDrizzleCount = await countRows("_drizzle_migrations");
   console.log(`[Migration Verify] _drizzle_migrations count: ${postMigDrizzleCount}`);
 
   // 4. Run Seed Script
