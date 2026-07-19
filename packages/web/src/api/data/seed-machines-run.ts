@@ -10,30 +10,22 @@ async function main() {
   let inserted = 0;
   let updated = 0;
 
+  const existingMachines = await db.select().from(machines);
+
   for (const m of SEED_MACHINES) {
-    // Determine possible old names for mapping/idempotency
-    const alternativeNames: string[] = [m.name];
-    if (m.name === "eベルセルク無双 第2章 10連撃Ver.") {
-      alternativeNames.push("デカスタeベルセルク無双第2章10連撃Ver.");
-    }
-    if (m.name === "ぱちんこ 必殺仕事人VI") {
-      alternativeNames.push("ぱちんこ 必殺仕事人VI オッケー");
-    }
-    if (m.name === "eフィーバー デッドマウント・デスプレイ 魂神9000") {
-      alternativeNames.push("eフィーバー デッドマウント・デスプレイ 魂神");
-    }
-    if (m.name === "L戦国乙女5 業火を穿つ宿焔の双刃") {
-      alternativeNames.push("L戦国乙女5 業火を穿つ宿焔 of 敢戦の双刃");
+    // Determine target existing record to update
+    let existingRecord = null;
+
+    if (m.id !== undefined) {
+      existingRecord = existingMachines.find(x => x.id === m.id) || null;
     }
 
-    // Find any existing record matching current name or old alternative names
-    let existingRecord = null;
-    for (const altName of alternativeNames) {
-      const records = await db.select().from(machines).where(eq(machines.name, altName));
-      if (records.length > 0) {
-        existingRecord = records[0];
-        break;
-      }
+    if (!existingRecord) {
+      existingRecord = existingMachines.find(x => x.name === m.name) || null;
+    }
+
+    if (!existingRecord && m.oldNameAliases) {
+      existingRecord = existingMachines.find(x => m.oldNameAliases!.includes(x.name)) || null;
     }
 
     const values = {
@@ -42,11 +34,11 @@ async function main() {
       releaseDate: m.releaseDate,
       type: m.type,
       shortName: m.shortName ?? null,
-      aliases: m.aliases ?? null,
-      uniqueAliases: m.uniqueAliases ?? null,
-      ambiguousAliases: m.ambiguousAliases ?? null,
-      resolvingKeywords: m.resolvingKeywords ?? null,
-      excludeTerms: m.excludeTerms ?? null,
+      aliases: m.aliases ? JSON.stringify(m.aliases) : null,
+      uniqueAliases: m.uniqueAliases ? JSON.stringify(m.uniqueAliases) : null,
+      ambiguousAliases: m.ambiguousAliases ? JSON.stringify(m.ambiguousAliases) : null,
+      resolvingKeywords: m.resolvingKeywords ? JSON.stringify(m.resolvingKeywords) : null,
+      excludeTerms: m.excludeTerms ? JSON.stringify(m.excludeTerms) : null,
       officialUrl: m.officialUrl ?? null,
       sourceUrl: m.sourceUrl ?? null,
       updatedAt: new Date(),
@@ -54,11 +46,11 @@ async function main() {
 
     if (existingRecord) {
       await db.update(machines).set(values).where(eq(machines.id, existingRecord.id));
-      console.log(`Updated existing machine: "${existingRecord.name}" -> "${m.name}" (ID: ${existingRecord.id}, Maker: ${m.maker})`);
+      console.log(`Updated existing machine ID ${existingRecord.id}: "${existingRecord.name}" -> "${m.name}"`);
       updated += 1;
     } else {
       await db.insert(machines).values(values);
-      console.log(`Inserted new machine: "${m.name}" (Maker: ${m.maker})`);
+      console.log(`Inserted new machine: "${m.name}"`);
       inserted += 1;
     }
   }

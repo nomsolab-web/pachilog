@@ -4,6 +4,8 @@
  * Add new machines weekly by editing this list or inserting directly into the `machines` table.
  */
 export type SeedMachine = {
+  id?: number; // Explicit target ID for pre-existing production database machine mapping
+  oldNameAliases?: string[]; // Previous machine names in production database to map to this record
   name: string;
   maker: string;
   releaseDate: string;
@@ -21,6 +23,8 @@ export type SeedMachine = {
 export const SEED_MACHINES: SeedMachine[] = [
   // Existing 5 machines in production database (updated with correct specifications, spelling, and manufacturers)
   {
+    id: 1,
+    oldNameAliases: ["Lパチスロ からくりサーカス2"],
     name: "Lパチスロ からくりサーカス2",
     maker: "SANKYO",
     releaseDate: "2026-07-06",
@@ -35,6 +39,8 @@ export const SEED_MACHINES: SeedMachine[] = [
     sourceUrl: "https://www.p-world.co.jp/machine/database/10420"
   },
   {
+    id: 2,
+    oldNameAliases: ["P/eフィーバーブルーロック Light ver.", "Pフィーバーブルーロック Light ver."],
     name: "Pフィーバーブルーロック Light ver.",
     maker: "SANKYO",
     releaseDate: "2026-07-06",
@@ -49,6 +55,8 @@ export const SEED_MACHINES: SeedMachine[] = [
     sourceUrl: "https://www.p-world.co.jp/machine/database/10421"
   },
   {
+    id: 3,
+    oldNameAliases: ["eフィーバー デッドマウント・デスプレイ 魂神", "eフィーバー デッドマウント・デスプレイ 魂神9000"],
     name: "eフィーバー デッドマウント・デスプレイ 魂神9000",
     maker: "SANKYO",
     releaseDate: "2026-06-08",
@@ -63,6 +71,8 @@ export const SEED_MACHINES: SeedMachine[] = [
     sourceUrl: "https://www.p-world.co.jp/machine/database/10415"
   },
   {
+    id: 4,
+    oldNameAliases: ["ぱちんこ 必殺仕事人VI オッケー", "ぱちんこ 必殺仕事人VI"],
     name: "ぱちんこ 必殺仕事人VI",
     maker: "オッケー.",
     releaseDate: "2026-07-06",
@@ -77,6 +87,8 @@ export const SEED_MACHINES: SeedMachine[] = [
     sourceUrl: "https://www.p-world.co.jp/machine/database/10422"
   },
   {
+    id: 5,
+    oldNameAliases: ["デカスタeベルセルク無双第2章10連撃Ver.", "eベルセルク無双 第2章 10連撃Ver."],
     name: "eベルセルク無双 第2章 10連撃Ver.",
     maker: "ニューギン",
     releaseDate: "2026-07-21",

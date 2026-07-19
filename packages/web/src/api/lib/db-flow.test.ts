@@ -20,28 +20,21 @@ async function runTestSeeder(dbInstance: any) {
   let inserted = 0;
   let updated = 0;
 
+  const existingMachines = await dbInstance.select().from(schema.machines);
+
   for (const m of SEED_MACHINES) {
-    const alternativeNames: string[] = [m.name];
-    if (m.name === "eベルセルク無双 第2章 10連撃Ver.") {
-      alternativeNames.push("デカスタeベルセルク無双第2章10連撃Ver.");
-    }
-    if (m.name === "ぱちんこ 必殺仕事人VI") {
-      alternativeNames.push("ぱちんこ 必殺仕事人VI オッケー");
-    }
-    if (m.name === "eフィーバー デッドマウント・デスプレイ 魂神9000") {
-      alternativeNames.push("eフィーバー デッドマウント・デスプレイ 魂神");
-    }
-    if (m.name === "L戦国乙女5 業火を穿つ宿焔の双刃") {
-      alternativeNames.push("L戦国乙女5 業火を穿つ宿焔 of 敢戦の双刃");
+    let existingRecord = null;
+
+    if (m.id !== undefined) {
+      existingRecord = existingMachines.find((x: any) => x.id === m.id) || null;
     }
 
-    let existingRecord = null;
-    for (const altName of alternativeNames) {
-      const records = await dbInstance.select().from(schema.machines).where(eq(schema.machines.name, altName));
-      if (records.length > 0) {
-        existingRecord = records[0];
-        break;
-      }
+    if (!existingRecord) {
+      existingRecord = existingMachines.find((x: any) => x.name === m.name) || null;
+    }
+
+    if (!existingRecord && m.oldNameAliases) {
+      existingRecord = existingMachines.find((x: any) => m.oldNameAliases!.includes(x.name)) || null;
     }
 
     const values = {
@@ -50,11 +43,11 @@ async function runTestSeeder(dbInstance: any) {
       releaseDate: m.releaseDate,
       type: m.type,
       shortName: m.shortName ?? null,
-      aliases: m.aliases ?? null,
-      uniqueAliases: m.uniqueAliases ?? null,
-      ambiguousAliases: m.ambiguousAliases ?? null,
-      resolvingKeywords: m.resolvingKeywords ?? null,
-      excludeTerms: m.excludeTerms ?? null,
+      aliases: m.aliases ? JSON.stringify(m.aliases) : null,
+      uniqueAliases: m.uniqueAliases ? JSON.stringify(m.uniqueAliases) : null,
+      ambiguousAliases: m.ambiguousAliases ? JSON.stringify(m.ambiguousAliases) : null,
+      resolvingKeywords: m.resolvingKeywords ? JSON.stringify(m.resolvingKeywords) : null,
+      excludeTerms: m.excludeTerms ? JSON.stringify(m.excludeTerms) : null,
       officialUrl: m.officialUrl ?? null,
       sourceUrl: m.sourceUrl ?? null,
       updatedAt: new Date(),
@@ -108,37 +101,46 @@ describe("Database migrations, seed, and rematch-all flow integration tests", ()
   });
 
   test("2. Seed machines idempotence and existing ID retention", async () => {
+    // Insert 5 legacy machines matching production pre-existing ID 1-5 names
+    await db.insert(schema.machines).values([
+      { id: 1, name: "Lパチスロ からくりサーカス2", maker: "SANKYO", releaseDate: "2026-07-06", type: "slot" },
+      { id: 2, name: "P/eフィーバーブルーロック Light ver.", maker: "SANKYO", releaseDate: "2026-07-06", type: "pachinko" },
+      { id: 3, name: "eフィーバー デッドマウント・デスプレイ 魂神", maker: "SANKYO", releaseDate: "2026-06-08", type: "pachinko" },
+      { id: 4, name: "ぱちんこ 必殺仕事人VI オッケー", maker: "オッケー.", releaseDate: "2026-07-06", type: "pachinko" },
+      { id: 5, name: "デカスタeベルセルク無双第2章10連撃Ver.", maker: "ニューギン", releaseDate: "2026-07-21", type: "pachinko" },
+    ]);
+
     // Run seed 1
     const res1 = await runTestSeeder(db);
-    expect(res1.inserted).toBe(SEED_MACHINES.length);
-    expect(res1.updated).toBe(0);
+    expect(res1.inserted).toBe(16); // 16 new machines inserted
+    expect(res1.updated).toBe(5);   // 5 existing machines updated in-place
 
     const seededMachines1 = await db.select().from(schema.machines);
-    expect(seededMachines1.length).toBe(SEED_MACHINES.length);
+    expect(seededMachines1.length).toBe(21); // Exactly 21 machines!
 
-    // Save machine IDs
-    const idMap = new Map(seededMachines1.map((m: any) => [m.name, m.id]));
+    // Verify IDs 1 to 5 are retained with new formal names
+    const m1 = seededMachines1.find((m: any) => m.id === 1);
+    expect(m1.name).toBe("Lパチスロ からくりサーカス2");
 
-    // Modify a machine in database to old name variant (simulating naming corrections)
-    const targetName = "L戦国乙女5 業火を穿つ宿焔の双刃";
-    const targetId = idMap.get(targetName);
-    expect(targetId !== undefined).toBe(true);
+    const m2 = seededMachines1.find((m: any) => m.id === 2);
+    expect(m2.name).toBe("Pフィーバーブルーロック Light ver.");
 
-    await db.update(schema.machines)
-      .set({ name: "L戦国乙女5 業火を穿つ宿焔 of 敢戦の双刃" })
-      .where(eq(schema.machines.id, targetId as number));
+    const m3 = seededMachines1.find((m: any) => m.id === 3);
+    expect(m3.name).toBe("eフィーバー デッドマウント・デスプレイ 魂神9000");
 
-    // Run seed 2
+    const m4 = seededMachines1.find((m: any) => m.id === 4);
+    expect(m4.name).toBe("ぱちんこ 必殺仕事人VI");
+
+    const m5 = seededMachines1.find((m: any) => m.id === 5);
+    expect(m5.name).toBe("eベルセルク無双 第2章 10連撃Ver.");
+
+    // Run seed 2 (Idempotency check)
     const res2 = await runTestSeeder(db);
-    expect(res2.inserted).toBe(0); // No new inserts
-    expect(res2.updated).toBe(SEED_MACHINES.length); // All updated idempotently
+    expect(res2.inserted).toBe(0);  // 0 new inserts
+    expect(res2.updated).toBe(21); // 21 updated idempotently
 
-    // Verify target machine name is corrected, and ID remains unchanged
     const verifiedMachines = await db.select().from(schema.machines);
-    expect(verifiedMachines.length).toBe(SEED_MACHINES.length);
-
-    const corrected = verifiedMachines.find((m: any) => m.id === targetId);
-    expect(corrected.name).toBe(targetName);
+    expect(verifiedMachines.length).toBe(21);
   });
 
   test("3. rematch-all preserves manual links, reviewed ambiguous links, and supports dry-run", async () => {
