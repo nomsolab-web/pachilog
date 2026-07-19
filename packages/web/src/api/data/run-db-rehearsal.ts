@@ -46,7 +46,6 @@ async function runRehearsal() {
 
   // Create client for source DB (Read-Only queries)
   const sourceClient = createClient({ url: prodUrl, authToken: prodToken });
-  const sourceDb = drizzle(sourceClient, { schema });
 
   // Create an isolated rehearsal SQLite database file
   const rehearsalDbPath = path.resolve("pachilog-db-phase21-rehearsal-20260720.db");
@@ -73,36 +72,29 @@ async function runRehearsal() {
   }
 
   console.log("Copying production snapshot data into Rehearsal DB...");
-  const channels = await sourceDb.select().from(schema.channels);
-  const channelSnapshots = await sourceDb.select().from(schema.channelSnapshots);
-  const videos = await sourceDb.select().from(schema.videos);
-  const videoSnapshots = await sourceDb.select().from(schema.videoSnapshots);
-  const links = await sourceDb.select().from(schema.videoMachineLinks);
-  const mentions = await sourceDb.select().from(schema.machineMentions);
+  const copyTables = [
+    "channels",
+    "channel_snapshots",
+    "videos",
+    "video_snapshots",
+    "machines",
+    "video_machine_links",
+    "machine_mentions"
+  ];
 
-  // Raw select for machines from production source (which does not have 0003 columns yet)
-  const machinesRes = await sourceClient.execute(
-    "SELECT id, name, maker, release_date, type, short_name, aliases, official_url, source_url FROM machines"
-  );
-  const machines = machinesRes.rows.map(row => ({
-    id: Number(row.id),
-    name: String(row.name),
-    maker: String(row.maker),
-    releaseDate: String(row.release_date),
-    type: String(row.type),
-    shortName: row.short_name ? String(row.short_name) : null,
-    aliases: row.aliases ? String(row.aliases) : null,
-    officialUrl: row.official_url ? String(row.official_url) : null,
-    sourceUrl: row.source_url ? String(row.source_url) : null,
-  }));
-
-  if (channels.length > 0) await rehearsalDb.insert(schema.channels).values(channels);
-  if (channelSnapshots.length > 0) await rehearsalDb.insert(schema.channelSnapshots).values(channelSnapshots);
-  if (videos.length > 0) await rehearsalDb.insert(schema.videos).values(videos);
-  if (videoSnapshots.length > 0) await rehearsalDb.insert(schema.videoSnapshots).values(videoSnapshots);
-  if (machines.length > 0) await rehearsalDb.insert(schema.machines).values(machines);
-  if (links.length > 0) await rehearsalDb.insert(schema.videoMachineLinks).values(links);
-  if (mentions.length > 0) await rehearsalDb.insert(schema.machineMentions).values(mentions);
+  for (const tbl of copyTables) {
+    const res = await sourceClient.execute(`SELECT * FROM ${tbl}`);
+    if (res.rows.length > 0) {
+      const cols = res.columns;
+      const placeholders = cols.map(() => "?").join(",");
+      const sqlStr = `INSERT INTO ${tbl} (${cols.map(c => `"${c}"`).join(",")}) VALUES (${placeholders})`;
+      for (const row of res.rows) {
+        const vals = cols.map(c => row[c]);
+        await rehearsalClient.execute({ sql: sqlStr, args: vals });
+      }
+    }
+    console.log(`  Copied ${res.rows.length} rows for table "${tbl}"`);
+  }
 
   // 2. Record Pre-Migration Table Counts
   const preCounts = {
