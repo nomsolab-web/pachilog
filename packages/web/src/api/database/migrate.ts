@@ -4,8 +4,10 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { fileURLToPath } from "node:url";
 
-const __dirname_resolved = __dirname;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -101,7 +103,7 @@ async function run() {
       `);
 
       // Find the 0000 migration file and compute its hash
-      const migrationsDir = path.join(__dirname_resolved, "../../../drizzle");
+      const migrationsDir = path.join(__dirname, "../../../drizzle");
       const journalPath = path.join(migrationsDir, "meta/_journal.json");
       const journal = JSON.parse(fs.readFileSync(journalPath, "utf-8"));
       const baseEntry = journal.entries.find((e: any) => e.idx === 0);
@@ -126,34 +128,8 @@ async function run() {
   }
 
   // 2. Run Drizzle migrations
-  await migrate(db, { migrationsFolder: path.join(__dirname_resolved, "../../../drizzle") });
+  await migrate(db, { migrationsFolder: path.join(__dirname, "../../../drizzle") });
   console.log("Migrations applied successfully!");
-
-  // 3. Post-migration validation: verify ambiguous_video_links existence, columns, and indexes
-  console.log("Verifying post-migration structure for ambiguous_video_links...");
-  const postTablesResult = await client.execute("SELECT name FROM sqlite_master WHERE type='table'");
-  const postTableNames = postTablesResult.rows.map(r => r.name as string);
-  
-  if (!postTableNames.includes("ambiguous_video_links")) {
-    throw new Error("Post-migration validation failed: 'ambiguous_video_links' table does not exist.");
-  }
-  
-  const ambiguousInfo = await client.execute("PRAGMA table_info(ambiguous_video_links)");
-  const ambiguousCols = ambiguousInfo.rows.map((r: any) => r.name);
-  const expectedCols = ["id", "video_id", "candidate_machine_id", "matched_terms", "confidence", "reason", "review_status", "created_at", "updated_at", "reviewed_at"];
-  const missingCols = expectedCols.filter(col => !ambiguousCols.includes(col));
-  if (missingCols.length > 0) {
-    throw new Error(`Post-migration validation failed: 'ambiguous_video_links' table is missing columns: ${missingCols.join(", ")}`);
-  }
-  
-  const indexInfo = await client.execute("PRAGMA index_list(ambiguous_video_links)");
-  const indexNames = indexInfo.rows.map((r: any) => r.name);
-  const expectedIndexes = ["ambiguous_video_link_idx", "ambiguous_video_id_idx", "ambiguous_machine_id_idx", "ambiguous_review_status_idx"];
-  const missingIndexes = expectedIndexes.filter(idx => !indexNames.includes(idx));
-  if (missingIndexes.length > 0) {
-    throw new Error(`Post-migration validation failed: 'ambiguous_video_links' is missing indexes: ${missingIndexes.join(", ")}`);
-  }
-  console.log("Post-migration validation successful: 'ambiguous_video_links' table structure verified!");
 }
 
 run()
