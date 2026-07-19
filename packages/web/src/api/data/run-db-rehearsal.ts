@@ -19,6 +19,14 @@ function getSanitizedDbName(dbUrl: string): string {
   }
 }
 
+function findMigrationFile(filename: string): string {
+  const p1 = path.resolve("drizzle", filename);
+  if (fs.existsSync(p1)) return p1;
+  const p2 = path.resolve("packages/web/drizzle", filename);
+  if (fs.existsSync(p2)) return p2;
+  throw new Error(`Migration file ${filename} not found.`);
+}
+
 async function runRehearsal() {
   const startTime = Date.now();
   console.log("=================================================");
@@ -52,8 +60,8 @@ async function runRehearsal() {
   console.log(`[DB Guard] Target Rehearsal DB Name: ${rehearsalDbName}`);
 
   // 1. Initialize Rehearsal DB Schema from 0000 and 0001 migrations
-  const sql0000 = fs.readFileSync(path.resolve("packages/web/drizzle/0000_freezing_nemesis.sql"), "utf-8");
-  const sql0001 = fs.readFileSync(path.resolve("packages/web/drizzle/0001_striped_omega_flight.sql"), "utf-8");
+  const sql0000 = fs.readFileSync(findMigrationFile("0000_freezing_nemesis.sql"), "utf-8");
+  const sql0001 = fs.readFileSync(findMigrationFile("0001_striped_omega_flight.sql"), "utf-8");
 
   for (const stmt of sql0000.split("--> statement-breakpoint")) {
     const trimmed = stmt.trim();
@@ -114,8 +122,8 @@ async function runRehearsal() {
 
   // 3. Execute Migrations (0002 & 0003)
   console.log("\nExecuting migrations 0002 and 0003 on Rehearsal DB...");
-  const sql0002 = fs.readFileSync(path.resolve("packages/web/drizzle/0002_rapid_silver_fox.sql"), "utf-8");
-  const sql0003 = fs.readFileSync(path.resolve("packages/web/drizzle/0003_flashy_kree.sql"), "utf-8");
+  const sql0002 = fs.readFileSync(findMigrationFile("0002_rapid_silver_fox.sql"), "utf-8");
+  const sql0003 = fs.readFileSync(findMigrationFile("0003_flashy_kree.sql"), "utf-8");
 
   for (const stmt of sql0002.split("--> statement-breakpoint")) {
     const trimmed = stmt.trim();
