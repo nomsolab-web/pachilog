@@ -149,9 +149,24 @@ async function runRehearsal() {
   const channelSnapshots = await sourceDb.select().from(schema.channelSnapshots);
   const videos = await sourceDb.select().from(schema.videos);
   const videoSnapshots = await sourceDb.select().from(schema.videoSnapshots);
-  const machines = await sourceDb.select().from(schema.machines);
   const links = await sourceDb.select().from(schema.videoMachineLinks);
   const mentions = await sourceDb.select().from(schema.machineMentions);
+
+  // Raw select for machines from production source (which does not have 0003 columns yet)
+  const machinesRes = await sourceClient.execute(
+    "SELECT id, name, maker, release_date, type, short_name, aliases, official_url, source_url FROM machines"
+  );
+  const machines = machinesRes.rows.map(row => ({
+    id: Number(row.id),
+    name: String(row.name),
+    maker: String(row.maker),
+    releaseDate: String(row.release_date),
+    type: String(row.type),
+    shortName: row.short_name ? String(row.short_name) : null,
+    aliases: row.aliases ? String(row.aliases) : null,
+    officialUrl: row.official_url ? String(row.official_url) : null,
+    sourceUrl: row.source_url ? String(row.source_url) : null,
+  }));
 
   if (channels.length > 0) await rehearsalDb.insert(schema.channels).values(channels);
   if (channelSnapshots.length > 0) await rehearsalDb.insert(schema.channelSnapshots).values(channelSnapshots);
