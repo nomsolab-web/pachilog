@@ -179,7 +179,7 @@ async function runRehearsal() {
           resolvingKeywords: resolvingKeywordsStr,
           officialUrl: seed.officialUrl ?? null,
           sourceUrl: seed.sourceUrl ?? null,
-          updatedAt: new Date().toISOString(),
+          updatedAt: new Date(),
         })
         .where(eq(schema.machines.id, existingId));
     } else {
@@ -360,7 +360,7 @@ async function runRehearsal() {
   for (const seed of SEED_MACHINES) {
     const existingId = existingMap.get(seed.name);
     if (existingId !== undefined) {
-      await rehearsalDb.update(schema.machines).set({ updatedAt: new Date().toISOString() }).where(eq(schema.machines.id, existingId));
+      await rehearsalDb.update(schema.machines).set({ updatedAt: new Date() }).where(eq(schema.machines.id, existingId));
     }
   }
 
