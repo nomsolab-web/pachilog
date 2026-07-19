@@ -294,9 +294,10 @@ async function runRehearsal() {
         for (const amb of ambMatches) {
           await tx.insert(schema.ambiguousVideoLinks).values({
             videoId: video.videoId,
-            machineId: amb.machineId,
+            candidateMachineId: amb.machineId,
             matchedTerms: JSON.stringify(amb.matchedTerms),
             confidence: amb.confidence,
+            reason: amb.reason,
             reviewStatus: "pending",
           });
         }
@@ -347,7 +348,7 @@ async function runRehearsal() {
 
   // Check ambiguous links leak
   const ambiguousLinks = await rehearsalDb.select().from(schema.ambiguousVideoLinks);
-  const ambPairs = new Set(ambiguousLinks.map(a => `${a.videoId}::${a.machineId}`));
+  const ambPairs = new Set(ambiguousLinks.map(a => `${a.videoId}::${a.candidateMachineId}`));
   let ambLeakedInMentions = 0;
   for (const ambPair of ambPairs) {
     if (mentionPairs.has(ambPair)) ambLeakedInMentions++;
@@ -403,9 +404,10 @@ async function runRehearsal() {
         for (const amb of ambMatches) {
           await tx.insert(schema.ambiguousVideoLinks).values({
             videoId: video.videoId,
-            machineId: amb.machineId,
+            candidateMachineId: amb.machineId,
             matchedTerms: JSON.stringify(amb.matchedTerms),
             confidence: amb.confidence,
+            reason: amb.reason,
             reviewStatus: "pending",
           });
         }
