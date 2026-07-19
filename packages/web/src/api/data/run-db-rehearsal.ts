@@ -51,98 +51,18 @@ async function runRehearsal() {
   const rehearsalDbName = "pachilog-db-phase21-rehearsal-20260720";
   console.log(`[DB Guard] Target Rehearsal DB Name: ${rehearsalDbName}`);
 
-  // 1. Initialize Rehearsal DB Schema (0000 & 0001 initial tables)
-  await rehearsalClient.execute(`
-    CREATE TABLE IF NOT EXISTS channels (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id TEXT NOT NULL UNIQUE,
-      title TEXT NOT NULL,
-      description TEXT,
-      custom_url TEXT,
-      published_at TEXT,
-      thumbnail_url TEXT,
-      default_language TEXT,
-      subscriber_count INTEGER NOT NULL DEFAULT 0,
-      video_count INTEGER NOT NULL DEFAULT 0,
-      view_count INTEGER NOT NULL DEFAULT 0,
-      banner_url TEXT,
-      status TEXT NOT NULL DEFAULT 'active',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS channel_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id INTEGER NOT NULL,
-      subscriber_count INTEGER NOT NULL,
-      video_count INTEGER NOT NULL,
-      view_count INTEGER NOT NULL,
-      recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS videos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL UNIQUE,
-      channel_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT,
-      published_at TEXT,
-      thumbnail_url TEXT,
-      duration TEXT,
-      view_count INTEGER NOT NULL DEFAULT 0,
-      like_count INTEGER NOT NULL DEFAULT 0,
-      comment_count INTEGER NOT NULL DEFAULT 0,
-      tags TEXT,
-      match_status TEXT NOT NULL DEFAULT 'pending',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS video_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id INTEGER NOT NULL,
-      view_count INTEGER NOT NULL,
-      like_count INTEGER NOT NULL,
-      comment_count INTEGER NOT NULL,
-      recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS machines (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      maker TEXT NOT NULL,
-      release_date TEXT NOT NULL,
-      type TEXT NOT NULL,
-      short_name TEXT,
-      aliases TEXT,
-      official_url TEXT,
-      source_url TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS video_machine_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL,
-      machine_id INTEGER NOT NULL,
-      match_confidence INTEGER NOT NULL,
-      match_method TEXT NOT NULL,
-      matched_term TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS machine_mentions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      machine_id INTEGER NOT NULL,
-      channel_id INTEGER NOT NULL,
-      video_id TEXT NOT NULL,
-      video_title TEXT NOT NULL,
-      view_count INTEGER NOT NULL DEFAULT 0,
-      like_count INTEGER NOT NULL DEFAULT 0,
-      comment_count INTEGER NOT NULL DEFAULT 0,
-      published_at TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS _drizzle_migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      hash TEXT NOT NULL,
-      created_at INTEGER
-    );
-  `);
+  // 1. Initialize Rehearsal DB Schema from 0000 and 0001 migrations
+  const sql0000 = fs.readFileSync(path.resolve("packages/web/drizzle/0000_freezing_nemesis.sql"), "utf-8");
+  const sql0001 = fs.readFileSync(path.resolve("packages/web/drizzle/0001_striped_omega_flight.sql"), "utf-8");
+
+  for (const stmt of sql0000.split("--> statement-breakpoint")) {
+    const trimmed = stmt.trim();
+    if (trimmed) await rehearsalClient.execute(trimmed);
+  }
+  for (const stmt of sql0001.split("--> statement-breakpoint")) {
+    const trimmed = stmt.trim();
+    if (trimmed) await rehearsalClient.execute(trimmed);
+  }
 
   console.log("Copying production snapshot data into Rehearsal DB...");
   const channels = await sourceDb.select().from(schema.channels);
@@ -194,28 +114,19 @@ async function runRehearsal() {
 
   // 3. Execute Migrations (0002 & 0003)
   console.log("\nExecuting migrations 0002 and 0003 on Rehearsal DB...");
+  const sql0002 = fs.readFileSync(path.resolve("packages/web/drizzle/0002_rapid_silver_fox.sql"), "utf-8");
+  const sql0003 = fs.readFileSync(path.resolve("packages/web/drizzle/0003_flashy_kree.sql"), "utf-8");
+
+  for (const stmt of sql0002.split("--> statement-breakpoint")) {
+    const trimmed = stmt.trim();
+    if (trimmed) await rehearsalClient.execute(trimmed);
+  }
+  for (const stmt of sql0003.split("--> statement-breakpoint")) {
+    const trimmed = stmt.trim();
+    if (trimmed) await rehearsalClient.execute(trimmed);
+  }
+
   await rehearsalClient.execute(`
-    CREATE TABLE IF NOT EXISTS ambiguous_video_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL,
-      machine_id INTEGER NOT NULL,
-      matched_terms TEXT NOT NULL,
-      confidence INTEGER NOT NULL DEFAULT 50,
-      review_status TEXT NOT NULL DEFAULT 'pending',
-      reviewed_at TEXT,
-      reviewer_note TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_ambiguous_links_video_machine ON ambiguous_video_links (video_id, machine_id);
-    CREATE INDEX IF NOT EXISTS idx_ambiguous_links_status ON ambiguous_video_links (review_status);
-    CREATE INDEX IF NOT EXISTS idx_ambiguous_links_video ON ambiguous_video_links (video_id);
-    CREATE INDEX IF NOT EXISTS idx_ambiguous_links_machine ON ambiguous_video_links (machine_id);
-
-    ALTER TABLE machines ADD COLUMN unique_aliases TEXT;
-    ALTER TABLE machines ADD COLUMN ambiguous_aliases TEXT;
-    ALTER TABLE machines ADD COLUMN resolving_keywords TEXT;
-
     INSERT INTO _drizzle_migrations (hash, created_at) VALUES ('0002_rapid_silver_fox', ${Date.now()});
     INSERT INTO _drizzle_migrations (hash, created_at) VALUES ('0003_flashy_kree', ${Date.now()});
   `);
