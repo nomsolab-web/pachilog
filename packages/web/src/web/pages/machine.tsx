@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX } from "lucide-react";
@@ -12,17 +12,13 @@ import {
   updateContentTypeSearchParams,
   type VideoContentTypeValue,
 } from "../lib/video-content-types";
+import {
+  groupMachineVideosByRelease,
+  nextMachineReleaseTabAfterContentTypeChange,
+  type MachineReleaseTabId,
+} from "../lib/machine-video-tabs";
 
 type SortMode = "newest" | "views";
-type VideoMention = {
-  videoId: string;
-  videoTitle: string;
-  viewCount: number;
-  publishedAt: string | null;
-  channelName: string;
-  channelThumbnailUrl: string | null;
-  contentType: VideoContentTypeValue;
-};
 
 function MachinePage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +28,8 @@ function MachinePage() {
   const contentType = parseVideoContentType(new URLSearchParams(queryStringFromLocation(location)).get("contentType"));
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [visibleCount, setVisibleCount] = useState(20);
+  const [activeTab, setActiveTab] = useState<MachineReleaseTabId>("postRelease7");
+  const syncedContentTypeRef = useRef<VideoContentTypeValue | null>(null);
 
   const detail = useQuery({
     queryKey: ["machine", id, contentType],
@@ -66,80 +64,30 @@ function MachinePage() {
     return sorted;
   }, [detail.data, sortMode]);
 
-  // Group sorted mentions by release date
   const groups = useMemo(() => {
-    const preRelease: VideoMention[] = [];
-    const postRelease7: VideoMention[] = [];
-    const postReleaseAfter: VideoMention[] = [];
-    const unclassified: VideoMention[] = [];
-
     if (!detail.data || "error" in detail.data) {
-      return { preRelease, postRelease7, postReleaseAfter, unclassified };
+      return { preRelease: [], postRelease7: [], postReleaseAfter: [], unclassified: [] };
     }
-
-    const releaseDate = detail.data.machine.releaseDate;
-    if (!releaseDate) {
-      return {
-        preRelease,
-        postRelease7,
-        postReleaseAfter,
-        unclassified: mentions,
-      };
-    }
-
-    const relTime = new Date(releaseDate).getTime();
-    if (isNaN(relTime)) {
-      return {
-        preRelease,
-        postRelease7,
-        postReleaseAfter,
-        unclassified: mentions,
-      };
-    }
-
-    // 7 days in milliseconds: 7 * 24 * 60 * 60 * 1000
-    const relTimePlus7 = relTime + 7 * 24 * 60 * 60 * 1000;
-
-    for (const video of mentions) {
-      if (!video.publishedAt) {
-        unclassified.push(video);
-        continue;
-      }
-      const pubTime = new Date(video.publishedAt).getTime();
-      if (isNaN(pubTime)) {
-        unclassified.push(video);
-        continue;
-      }
-
-      if (pubTime < relTime) {
-        preRelease.push(video);
-      } else if (pubTime <= relTimePlus7) {
-        postRelease7.push(video);
-      } else {
-        postReleaseAfter.push(video);
-      }
-    }
-
-    return { preRelease, postRelease7, postReleaseAfter, unclassified };
+    return groupMachineVideosByRelease(mentions, detail.data.machine.releaseDate);
   }, [mentions, detail.data]);
 
-  const tabs = [
+  const tabs = useMemo(() => [
     { id: "postRelease7", label: "導入後7日以内", count: groups.postRelease7.length, data: groups.postRelease7 },
     { id: "postReleaseAfter", label: "導入8日目以降", count: groups.postReleaseAfter.length, data: groups.postReleaseAfter },
     { id: "preRelease", label: "導入前", count: groups.preRelease.length, data: groups.preRelease },
     { id: "unclassified", label: "分類不能", count: groups.unclassified.length, data: groups.unclassified },
-  ];
+  ] as const, [groups]);
 
-  // Pick first tab that has items, default to the first tab (postRelease7)
-  const defaultTab = tabs.find(t => t.count > 0)?.id || "postRelease7";
-  const [activeTab, setActiveTab] = useState<string>(defaultTab);
-
-  // Sync activeTab if defaultTab changes (e.g. data loads)
-  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
-  if (defaultTab !== prevDefaultTab) {
-    setPrevDefaultTab(defaultTab);
-    setActiveTab(defaultTab);
-  }
+  useEffect(() => {
+    if (detail.isLoading || !detail.data || "error" in detail.data) return;
+    const didContentTypeChange = syncedContentTypeRef.current !== contentType;
+    const nextTab = nextMachineReleaseTabAfterContentTypeChange(tabs, activeTab, didContentTypeChange);
+    if (nextTab !== activeTab) setActiveTab(nextTab);
+    if (didContentTypeChange) {
+      setVisibleCount(20);
+      syncedContentTypeRef.current = contentType;
+    }
+  }, [activeTab, contentType, detail.data, detail.isLoading, tabs]);
 
   if (detail.isLoading) {
     return <div className="animate-pulse h-64 rounded-xl border surface-card" />;

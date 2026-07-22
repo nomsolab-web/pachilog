@@ -3,10 +3,12 @@ import {
   DEFAULT_VIDEO_CONTENT_TYPE,
   VIDEO_CONTENT_TYPE_TABS,
   machineDetailQueryParams,
+  normalizeContentTypeSearchParams,
   parseVideoContentType,
   updateContentTypeSearchParams,
-  videoTrendingQueryParams,
   videoContentTypeLabel,
+  videoTrendMetricLabel,
+  videoTrendingQueryParams,
 } from "./video-content-types";
 
 describe("video content type tabs", () => {
@@ -57,5 +59,30 @@ describe("video content type tabs", () => {
     expect(parseVideoContentType(new URLSearchParams("?contentType=short").get("contentType"))).toBe("short");
     expect(parseVideoContentType(new URLSearchParams("?contentType=promotion").get("contentType"))).toBe("promotion");
     expect(parseVideoContentType(new URLSearchParams("?contentType=bad").get("contentType"))).toBe("standard");
+  });
+
+  test("normalizes legacy type query params while preserving unrelated values", () => {
+    const legacy = normalizeContentTypeSearchParams("?type=short&mode=7d&cursor=abc");
+    expect(legacy.contentType).toBe("short");
+    expect(legacy.shouldReplace).toBe(true);
+    expect(legacy.params.get("contentType")).toBe("short");
+    expect(legacy.params.get("mode")).toBe("7d");
+    expect(legacy.params.has("type")).toBe(false);
+    expect(legacy.params.has("cursor")).toBe(false);
+  });
+
+  test("prefers contentType when legacy type is mixed in", () => {
+    const mixed = normalizeContentTypeSearchParams("?type=short&contentType=live&mode=previous&cursor=abc");
+    expect(mixed.contentType).toBe("live");
+    expect(mixed.params.get("contentType")).toBe("live");
+    expect(mixed.params.has("type")).toBe(false);
+    expect(mixed.params.has("cursor")).toBe(false);
+  });
+
+  test("keeps provisional snapshot day labels in trend metrics", () => {
+    expect(
+      videoTrendMetricLabel({ hasTrend: true, viewDelta: 1234, viewDeltaPct: 12.34, isProvisional: true, snapshotDays: 3 }),
+    ).toContain("(3日)");
+    expect(videoTrendMetricLabel({ hasTrend: false, viewDelta: 0, viewDeltaPct: 0 })).toBe("データ蓄積中");
   });
 });

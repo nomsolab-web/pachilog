@@ -40,6 +40,27 @@ export function updateContentTypeSearchParams(
   return params;
 }
 
+export function normalizeContentTypeSearchParams(search: string) {
+  const params = new URLSearchParams(search);
+  const rawContentType = params.get("contentType");
+  const rawLegacyType = params.get("type");
+  const normalized = parseVideoContentType(rawContentType ?? rawLegacyType);
+  const shouldReplace =
+    params.has("type") || params.has("cursor") || (rawContentType !== null && rawContentType !== normalized);
+
+  if (shouldReplace) {
+    params.set("contentType", normalized);
+    params.delete("type");
+    params.delete("cursor");
+  }
+
+  return {
+    contentType: normalized,
+    params,
+    shouldReplace,
+  };
+}
+
 export function videoTrendingQueryParams(
   mode: "previous" | "7d",
   contentType: VideoContentTypeValue,
@@ -55,4 +76,17 @@ export function videoTrendingQueryParams(
 
 export function machineDetailQueryParams(contentType: VideoContentTypeValue) {
   return { contentType };
+}
+
+export function videoTrendMetricLabel(video: {
+  hasTrend: boolean;
+  viewDelta: number;
+  viewDeltaPct: number;
+  isProvisional?: boolean;
+  snapshotDays?: number;
+}) {
+  if (!video.hasTrend) return "データ蓄積中";
+  return `+${video.viewDelta.toLocaleString("ja-JP")}回 / ${video.viewDeltaPct.toFixed(1)}%${
+    video.isProvisional ? ` (${video.snapshotDays ?? 0}日)` : ""
+  }`;
 }

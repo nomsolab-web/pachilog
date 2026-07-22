@@ -6,8 +6,10 @@ import { api } from "../lib/api";
 import { VideoCard } from "../components/video-card";
 import {
   VIDEO_CONTENT_TYPE_TABS,
+  normalizeContentTypeSearchParams,
   parseVideoContentType,
   updateContentTypeSearchParams,
+  videoTrendMetricLabel,
   videoTrendingQueryParams,
   type VideoContentTypeValue,
 } from "../lib/video-content-types";
@@ -50,22 +52,18 @@ function VideosTrendingPage() {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(queryStringFromLocation(location));
-    const rawContentType = params.get("contentType") ?? params.get("type");
-    if (rawContentType && rawContentType !== contentType) {
-      params.set("contentType", contentType);
-      params.delete("type");
-      params.delete("cursor");
-      setLocation(`${path || "/videos/trending"}?${params.toString()}`, { replace: true });
+    const normalized = normalizeContentTypeSearchParams(queryStringFromLocation(location));
+    if (normalized.shouldReplace) {
+      setLocation(`${path || "/videos/trending"}?${normalized.params.toString()}`, { replace: true });
     }
-  }, [contentType, location, path, setLocation]);
+  }, [location, path, setLocation]);
 
   return (
     <div>
       <section className="site-hero rounded-2xl px-5 py-5 mb-8 sm:px-7">
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl mb-2">伸びている動画</h1>
         <p className="text-muted-foreground text-sm max-w-3xl leading-relaxed">
-          収集済みの動画から、比較期間内に再生数が伸びた動画を種別ごとに表示します。
+          収集済みの動画から、比較期間内に再生数が伸びた動画を種別ごとに表示します。「前回収集から」は24時間固定ではなく、前回データ取得時点との比較です。
         </p>
       </section>
 
@@ -122,11 +120,7 @@ function VideosTrendingPage() {
                   channelName={video.channelName}
                   channelThumbnailUrl={video.channelThumbnailUrl}
                   contentType={video.contentType}
-                  metric={
-                    video.hasTrend
-                      ? `+${video.viewDelta.toLocaleString("ja-JP")}回 / ${video.viewDeltaPct.toFixed(1)}%`
-                      : "データ蓄積中"
-                  }
+                  metric={videoTrendMetricLabel(video)}
                 />
               </div>
             ))}
@@ -155,7 +149,7 @@ function VideosTrendingPage() {
 
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
         <TrendingUp className="size-4" />
-        順位は比較期間内の再生数増加で決まります。
+        順位は比較期間内の再生数増加で決まります。データが7日分そろっていない動画は暫定日数を併記します。
       </div>
     </div>
   );
