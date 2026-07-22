@@ -1,6 +1,6 @@
 import { Eye, ExternalLink } from "lucide-react";
 import { ChannelAvatar } from "./channel-avatar";
-import { videoContentTypeLabel, type VideoContentTypeValue } from "../lib/video-content-types";
+import { type VideoContentTypeValue } from "../lib/video-content-types";
 
 export type VideoType = Exclude<VideoContentTypeValue, "unknown">;
 
@@ -54,13 +54,15 @@ export function VideoCard({
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const imageUrl = thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
   const videoType = contentType ?? getVideoType(title, channelName);
-  
-  const typeBadge = videoType === "unknown" ? { label: videoContentTypeLabel("unknown"), className: "bg-secondary text-foreground border border-border" } : ({
-    short: { label: "ショート", className: "bg-red-600 text-white border border-red-500/25" },
-    live: { label: "ライブ", className: "bg-rose-500 text-white font-bold animate-pulse border border-rose-400/25" },
-    promotion: { label: "公式PV・CM", className: "bg-gold text-black font-extrabold border border-gold/25" },
-    standard: { label: "通常動画", className: "bg-black/75 text-white border border-white/10" }
-  } as const)[videoType];
+  const showBadge = videoType !== "standard";
+  const typeBadge = videoType === "unknown"
+    ? { label: "その他", className: "bg-zinc-800 text-zinc-300 border border-zinc-700/50" }
+    : ({
+        short: { label: "ショート", className: "bg-red-600 text-white border border-red-500/30" },
+        live: { label: "ライブ", className: "bg-rose-600 text-white border border-rose-500/30 animate-pulse-subtle" },
+        promotion: { label: "公式PV・CM", className: "bg-gold text-black font-extrabold border border-gold/20" },
+        standard: { label: "", className: "" }
+      } as const)[videoType];
 
   return (
     <article className="interactive-card overflow-hidden rounded-xl border">
@@ -74,9 +76,11 @@ export function VideoCard({
         >
           <img src={imageUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
         </a>
-        <span className={`absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded font-semibold tracking-wider backdrop-blur-sm shadow-md z-10 ${typeBadge.className}`}>
-          {typeBadge.label}
-        </span>
+        {showBadge && (
+          <span className={`absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded font-semibold tracking-wider backdrop-blur-sm shadow-md z-10 ${typeBadge.className}`}>
+            {typeBadge.label}
+          </span>
+        )}
       </div>
       <div className="p-4">
         <h3 className="line-clamp-2 min-h-11 font-semibold leading-snug">{title}</h3>
