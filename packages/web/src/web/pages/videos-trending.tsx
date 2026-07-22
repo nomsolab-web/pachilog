@@ -175,21 +175,17 @@ export function ContentTypeTabs({
 }) {
   return (
     <div
-      role="tablist"
-      aria-label="動画種別"
       className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
     >
       {VIDEO_CONTENT_TYPE_TABS.map((tab) => {
         const isActive = active === tab.value;
-        const count = counts?.[tab.value] ?? 0;
+        const count = counts?.[tab.value];
         const isZero = count === 0;
 
         return (
           <button
             key={tab.value}
-            role="tab"
-            aria-selected={isActive}
-            aria-controls={`trending-${tab.value}-panel`}
+            aria-pressed={isActive}
             onClick={() => onChange(tab.value)}
             className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:border-gold rounded-t-md ${
               isActive
@@ -198,13 +194,13 @@ export function ContentTypeTabs({
             } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
           >
             {tab.label}
-            {counts?.[tab.value] !== undefined && (
+            {count !== undefined && (
               <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
                 isActive
                   ? "bg-gold/15 text-gold"
                   : "bg-secondary text-muted-foreground"
               } ${isZero ? "opacity-60" : ""}`}>
-                {counts[tab.value]}
+                {count}
               </span>
             )}
           </button>

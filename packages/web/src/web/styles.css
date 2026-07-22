@@ -174,3 +174,9 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-subtle {
+    animation: none !important;
+  }
+}

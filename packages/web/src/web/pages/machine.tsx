@@ -183,21 +183,17 @@ function MachinePage() {
         </div>
 
         <div
-          role="tablist"
-          aria-label="動画種別"
           className="mb-5 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
         >
           {VIDEO_CONTENT_TYPE_TABS.map((tab) => {
             const isActive = contentType === tab.value;
-            const count = contentTypeCounts?.[tab.value] ?? 0;
+            const count = contentTypeCounts?.[tab.value];
             const isZero = count === 0;
 
             return (
               <button
                 key={tab.value}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`machine-videos-${tab.value}-panel`}
+                aria-pressed={isActive}
                 onClick={() => updateContentType(tab.value)}
                 className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:border-gold rounded-t-md ${
                   isActive
@@ -206,13 +202,13 @@ function MachinePage() {
                 } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
               >
                 {tab.label}
-                {contentTypeCounts?.[tab.value] !== undefined && (
+                {count !== undefined && (
                   <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
                     isActive
                       ? "bg-gold/15 text-gold"
                       : "bg-secondary text-muted-foreground"
                   } ${isZero ? "opacity-60" : ""}`}>
-                    {contentTypeCounts[tab.value]}
+                    {count}
                   </span>
                 )}
               </button>
@@ -223,8 +219,6 @@ function MachinePage() {
         {/* Category Tabs */}
         {mentions.length > 0 && (
           <div
-            role="tablist"
-            aria-label="動画の導入時期別分類"
             className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
           >
             {tabs.map((tab) => {
@@ -235,8 +229,7 @@ function MachinePage() {
               return (
                 <button
                   key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
+                  aria-pressed={isActive}
                   onClick={() => {
                     setActiveTab(tab.id);
                     setVisibleCount(20);
