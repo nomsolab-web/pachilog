@@ -10,7 +10,7 @@ export type SeedChannel = {
   active: boolean;
 };
 
-export const SEED_CHANNELS: SeedChannel[] = [
+export const SEED_CHANNELS: readonly SeedChannel[] = [
   { handle: "@isomaru-yoshiki", youtubeChannelId: "UC8yYqoMOYO_Q755YLJ-teoQ", name: "スロパチステーション", category: "media", active: true },
   { handle: "@janjan-renjiro", youtubeChannelId: "UCz6eq-lB8pdZrKE4QMxI24A", name: "すろぱちすてぇしょん", category: "media", active: true },
   { handle: "@janbaritv", youtubeChannelId: "UCB53EOfn8IdqjhzZ6myvt0g", name: "janbaritv", category: "media", active: true },
