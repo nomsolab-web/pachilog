@@ -1,7 +1,8 @@
 import { Eye, ExternalLink } from "lucide-react";
 import { ChannelAvatar } from "./channel-avatar";
+import { videoContentTypeLabel, type VideoContentTypeValue } from "../lib/video-content-types";
 
-export type VideoType = "standard" | "short" | "live" | "promotion";
+export type VideoType = Exclude<VideoContentTypeValue, "unknown">;
 
 export function getVideoType(title: string, channelName?: string | null): VideoType {
   const t = title.toLowerCase();
@@ -36,6 +37,7 @@ type Props = {
   channelName?: string | null;
   channelThumbnailUrl?: string | null;
   metric?: string;
+  contentType?: VideoContentTypeValue | null;
 };
 
 export function VideoCard({
@@ -47,17 +49,18 @@ export function VideoCard({
   channelName,
   channelThumbnailUrl,
   metric,
+  contentType,
 }: Props) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const imageUrl = thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-  const videoType = getVideoType(title, channelName);
+  const videoType = contentType ?? getVideoType(title, channelName);
   
-  const typeBadge = {
+  const typeBadge = videoType === "unknown" ? { label: videoContentTypeLabel("unknown"), className: "bg-secondary text-foreground border border-border" } : ({
     short: { label: "ショート", className: "bg-red-600 text-white border border-red-500/25" },
     live: { label: "ライブ", className: "bg-rose-500 text-white font-bold animate-pulse border border-rose-400/25" },
     promotion: { label: "公式PV・CM", className: "bg-gold text-black font-extrabold border border-gold/25" },
     standard: { label: "通常動画", className: "bg-black/75 text-white border border-white/10" }
-  }[videoType];
+  } as const)[videoType];
 
   return (
     <article className="interactive-card overflow-hidden rounded-xl border">

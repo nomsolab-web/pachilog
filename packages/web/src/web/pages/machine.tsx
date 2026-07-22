@@ -1,30 +1,58 @@
-import { useMemo, useState } from "react";
-import { useParams, Link } from "wouter";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX } from "lucide-react";
 import { api } from "../lib/api";
 import { MachineVoteWidget } from "../components/machine-vote-widget";
 import { VideoCard } from "../components/video-card";
+import {
+  VIDEO_CONTENT_TYPE_TABS,
+  machineDetailQueryParams,
+  parseVideoContentType,
+  updateContentTypeSearchParams,
+  type VideoContentTypeValue,
+} from "../lib/video-content-types";
+import {
+  groupMachineVideosByRelease,
+  nextMachineReleaseTabAfterContentTypeChange,
+  type MachineReleaseTabId,
+} from "../lib/machine-video-tabs";
 
 type SortMode = "newest" | "views";
-type VideoMention = {
-  videoId: string;
-  videoTitle: string;
-  viewCount: number;
-  publishedAt: string | null;
-  channelName: string;
-  channelThumbnailUrl: string | null;
-};
 
 function MachinePage() {
   const { id } = useParams<{ id: string }>();
+  const [location, setLocation] = useLocation();
+  const [, startTransition] = useTransition();
+  const [path] = location.split("?");
+  const contentType = parseVideoContentType(new URLSearchParams(queryStringFromLocation(location)).get("contentType"));
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [visibleCount, setVisibleCount] = useState(20);
+  const [activeTab, setActiveTab] = useState<MachineReleaseTabId>("postRelease7");
+  const syncedContentTypeRef = useRef<VideoContentTypeValue | null>(null);
 
   const detail = useQuery({
-    queryKey: ["machine", id],
-    queryFn: async () => (await api.machines[":id"].$get({ param: { id } })).json(),
+    queryKey: ["machine", id, contentType],
+    queryFn: async () => (await api.machines[":id"].$get({ param: { id }, query: machineDetailQueryParams(contentType) })).json(),
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(queryStringFromLocation(location));
+    const rawContentType = params.get("contentType");
+    if (rawContentType && rawContentType !== contentType) {
+      params.set("contentType", contentType);
+      params.delete("cursor");
+      setLocation(`${path || `/machines/${id}`}?${params.toString()}`, { replace: true });
+    }
+  }, [contentType, id, location, path, setLocation]);
+
+  const updateContentType = (nextContentType: VideoContentTypeValue) => {
+    startTransition(() => {
+      const params = updateContentTypeSearchParams(queryStringFromLocation(location), nextContentType, { resetCursor: true });
+      setVisibleCount(20);
+      setLocation(`${path || `/machines/${id}`}?${params.toString()}`);
+    });
+  };
 
   const mentions = useMemo(() => {
     if (!detail.data || "error" in detail.data) return [];
@@ -36,80 +64,30 @@ function MachinePage() {
     return sorted;
   }, [detail.data, sortMode]);
 
-  // Group sorted mentions by release date
   const groups = useMemo(() => {
-    const preRelease: VideoMention[] = [];
-    const postRelease7: VideoMention[] = [];
-    const postReleaseAfter: VideoMention[] = [];
-    const unclassified: VideoMention[] = [];
-
     if (!detail.data || "error" in detail.data) {
-      return { preRelease, postRelease7, postReleaseAfter, unclassified };
+      return { preRelease: [], postRelease7: [], postReleaseAfter: [], unclassified: [] };
     }
-
-    const releaseDate = detail.data.machine.releaseDate;
-    if (!releaseDate) {
-      return {
-        preRelease,
-        postRelease7,
-        postReleaseAfter,
-        unclassified: mentions,
-      };
-    }
-
-    const relTime = new Date(releaseDate).getTime();
-    if (isNaN(relTime)) {
-      return {
-        preRelease,
-        postRelease7,
-        postReleaseAfter,
-        unclassified: mentions,
-      };
-    }
-
-    // 7 days in milliseconds: 7 * 24 * 60 * 60 * 1000
-    const relTimePlus7 = relTime + 7 * 24 * 60 * 60 * 1000;
-
-    for (const video of mentions) {
-      if (!video.publishedAt) {
-        unclassified.push(video);
-        continue;
-      }
-      const pubTime = new Date(video.publishedAt).getTime();
-      if (isNaN(pubTime)) {
-        unclassified.push(video);
-        continue;
-      }
-
-      if (pubTime < relTime) {
-        preRelease.push(video);
-      } else if (pubTime <= relTimePlus7) {
-        postRelease7.push(video);
-      } else {
-        postReleaseAfter.push(video);
-      }
-    }
-
-    return { preRelease, postRelease7, postReleaseAfter, unclassified };
+    return groupMachineVideosByRelease(mentions, detail.data.machine.releaseDate);
   }, [mentions, detail.data]);
 
-  const tabs = [
+  const tabs = useMemo(() => [
     { id: "postRelease7", label: "導入後7日以内", count: groups.postRelease7.length, data: groups.postRelease7 },
     { id: "postReleaseAfter", label: "導入8日目以降", count: groups.postReleaseAfter.length, data: groups.postReleaseAfter },
     { id: "preRelease", label: "導入前", count: groups.preRelease.length, data: groups.preRelease },
     { id: "unclassified", label: "分類不能", count: groups.unclassified.length, data: groups.unclassified },
-  ];
+  ] as const, [groups]);
 
-  // Pick first tab that has items, default to the first tab (postRelease7)
-  const defaultTab = tabs.find(t => t.count > 0)?.id || "postRelease7";
-  const [activeTab, setActiveTab] = useState<string>(defaultTab);
-
-  // Sync activeTab if defaultTab changes (e.g. data loads)
-  const [prevDefaultTab, setPrevDefaultTab] = useState(defaultTab);
-  if (defaultTab !== prevDefaultTab) {
-    setPrevDefaultTab(defaultTab);
-    setActiveTab(defaultTab);
-  }
+  useEffect(() => {
+    if (detail.isLoading || !detail.data || "error" in detail.data) return;
+    const didContentTypeChange = syncedContentTypeRef.current !== contentType;
+    const nextTab = nextMachineReleaseTabAfterContentTypeChange(tabs, activeTab, didContentTypeChange);
+    if (nextTab !== activeTab) setActiveTab(nextTab);
+    if (didContentTypeChange) {
+      setVisibleCount(20);
+      syncedContentTypeRef.current = contentType;
+    }
+  }, [activeTab, contentType, detail.data, detail.isLoading, tabs]);
 
   if (detail.isLoading) {
     return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
@@ -120,6 +98,7 @@ function MachinePage() {
   }
 
   const { machine, summary } = detail.data;
+  const contentTypeCounts = detail.data.contentTypeCounts;
   const activeGroupVideos = tabs.find(t => t.id === activeTab)?.data || [];
   const visibleMentions = activeGroupVideos.slice(0, visibleCount);
 
@@ -203,6 +182,27 @@ function MachinePage() {
           </div>
         </div>
 
+        <div className="mb-5 flex flex-wrap gap-2 border-b border-border pb-px">
+          {VIDEO_CONTENT_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => updateContentType(tab.value)}
+              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all ${
+                contentType === tab.value
+                  ? "border-gold text-gold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              {contentTypeCounts?.[tab.value] !== undefined && (
+                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {contentTypeCounts[tab.value]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Category Tabs */}
         {mentions.length > 0 && (
           <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px">
@@ -252,6 +252,7 @@ function MachinePage() {
                   viewCount={mention.viewCount}
                   channelName={mention.channelName}
                   channelThumbnailUrl={mention.channelThumbnailUrl}
+                  contentType={mention.contentType}
                 />
               ))}
             </div>
@@ -281,6 +282,12 @@ function formatDate(value: string | null | undefined) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" }).format(date);
+}
+
+function queryStringFromLocation(location: string) {
+  const queryStart = location.indexOf("?");
+  if (queryStart >= 0) return location.slice(queryStart);
+  return typeof window === "undefined" ? "" : window.location.search;
 }
 
 export default MachinePage;

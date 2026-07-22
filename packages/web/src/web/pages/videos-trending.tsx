@@ -1,100 +1,76 @@
-import { useEffect, useState, useTransition } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useTransition } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { TrendingUp, AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, TrendingUp } from "lucide-react";
 import { api } from "../lib/api";
-import { VideoCard, getVideoType } from "../components/video-card";
+import { VideoCard } from "../components/video-card";
+import {
+  VIDEO_CONTENT_TYPE_TABS,
+  normalizeContentTypeSearchParams,
+  parseVideoContentType,
+  updateContentTypeSearchParams,
+  videoTrendMetricLabel,
+  videoTrendingQueryParams,
+  type VideoContentTypeValue,
+} from "../lib/video-content-types";
 
 type Mode = "previous" | "7d";
-type ContentType = "standard" | "short" | "live" | "promotion";
 
 function VideosTrendingPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [, startTransition] = useTransition();
+  const { mode, contentType } = useVideoTrendingUrlState(location);
+  const [path] = location.split("?");
 
-  // Read URL query params
-  const searchParams = new URLSearchParams(window.location.search);
-  const mode = (searchParams.get("mode") as Mode) || "previous";
-  const contentType = (searchParams.get("type") as ContentType) || "standard";
-
-  const [visibleCount, setVisibleCount] = useState(20);
-  const [isAppending, setIsAppending] = useState(false);
-  const [srAnnouncement, setSrAnnouncement] = useState("");
-
-  const videos = useQuery({
-    queryKey: ["videos-trending", mode],
-    queryFn: async () => (await api.videos.trending.$get({ query: { mode } })).json(),
+  const videos = useInfiniteQuery({
+    queryKey: ["videos-trending", mode, contentType],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) =>
+      (
+        await api.videos.trending.$get({
+          query: videoTrendingQueryParams(mode, contentType, pageParam),
+        })
+      ).json(),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
-  const rawList = videos.data?.videos ?? [];
+  const pages = videos.data?.pages ?? [];
+  const videoList = pages.flatMap((page) => page.videos);
+  const counts = pages[0]?.counts;
 
-  // Parse types and calculate counts for each tab
-  const classifiedVideos = rawList.map(v => ({
-    ...v,
-    computedType: getVideoType(v.title, v.channelName),
-  }));
-
-  const counts = {
-    standard: classifiedVideos.filter(v => v.computedType === "standard").length,
-    short: classifiedVideos.filter(v => v.computedType === "short").length,
-    live: classifiedVideos.filter(v => v.computedType === "live").length,
-    promotion: classifiedVideos.filter(v => v.computedType === "promotion").length,
-  };
-
-  const filteredList = classifiedVideos.filter(v => v.computedType === contentType);
-  const paginatedList = filteredList.slice(0, visibleCount);
-
-  // Sync state changes back to URL query parameters
-  const updateParams = (newType: ContentType, newMode: Mode) => {
+  const updateParams = (next: { contentType?: VideoContentTypeValue; mode?: Mode }) => {
     startTransition(() => {
-      const params = new URLSearchParams();
-      params.set("type", newType);
-      params.set("mode", newMode);
-      setLocation(`${window.location.pathname}?${params.toString()}`);
-      setVisibleCount(20); // Reset pagination on filter change
+      const params = updateContentTypeSearchParams(
+        queryStringFromLocation(location),
+        next.contentType ?? contentType,
+        { resetCursor: true },
+      );
+      params.set("mode", next.mode ?? mode);
+      params.delete("type");
+      setLocation(`${path || "/videos/trending"}?${params.toString()}`);
     });
   };
 
-  // Announce page state to screen readers
   useEffect(() => {
-    if (videos.isLoading) {
-      setSrAnnouncement("データを読み込み中です。");
-    } else if (videos.isError) {
-      setSrAnnouncement("エラーが発生しました。");
-    } else {
-      setSrAnnouncement(
-        `動画の読み込みが完了しました。${filteredList.length}件中${paginatedList.length}件を表示しています。`
-      );
+    const normalized = normalizeContentTypeSearchParams(queryStringFromLocation(location));
+    if (normalized.shouldReplace) {
+      setLocation(`${path || "/videos/trending"}?${normalized.params.toString()}`, { replace: true });
     }
-  }, [videos.isLoading, videos.isError, filteredList.length, paginatedList.length]);
-
-  const handleLoadMore = () => {
-    setIsAppending(true);
-    // Simulate minor network delay for smooth UX and layout shift prevention
-    setTimeout(() => {
-      setVisibleCount(prev => Math.min(prev + 20, filteredList.length));
-      setIsAppending(false);
-    }, 400);
-  };
+  }, [location, path, setLocation]);
 
   return (
     <div>
-      <output aria-live="polite" className="sr-only">
-        {srAnnouncement}
-      </output>
-
       <section className="site-hero rounded-2xl px-5 py-5 mb-8 sm:px-7">
         <h1 className="font-display font-extrabold text-2xl sm:text-3xl mb-2">伸びている動画</h1>
         <p className="text-muted-foreground text-sm max-w-3xl leading-relaxed">
-          直近収集した動画履歴から、再生数の増加が大きい動画を表示します。「前回収集から」は24時間ではなく、前回データ取得時点との比較です。
+          収集済みの動画から、比較期間内に再生数が伸びた動画を種別ごとに表示します。「前回収集から」は24時間固定ではなく、前回データ取得時点との比較です。
         </p>
       </section>
 
-      {/* Mode Switcher */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="segmented-control flex gap-1 rounded-lg border p-1 bg-background/50">
           <button
-            onClick={() => updateParams(contentType, "previous")}
+            onClick={() => updateParams({ mode: "previous" })}
             className={`segmented-button px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-all ${
               mode === "previous" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -102,7 +78,7 @@ function VideosTrendingPage() {
             前回収集から
           </button>
           <button
-            onClick={() => updateParams(contentType, "7d")}
+            onClick={() => updateParams({ mode: "7d" })}
             className={`segmented-button px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-all ${
               mode === "7d" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -115,68 +91,22 @@ function VideosTrendingPage() {
         </Link>
       </div>
 
-      {/* Content Type Tabs */}
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap">
-        {(["standard", "short", "live", "promotion"] as ContentType[]).map((type) => {
-          const isActive = contentType === type;
-          const labels = {
-            standard: "通常動画",
-            short: "ショート",
-            live: "ライブ",
-            promotion: "公式PV・CM",
-          };
-          return (
-            <button
-              key={type}
-              onClick={() => updateParams(type, mode)}
-              className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 ${
-                isActive
-                  ? "border-gold text-gold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {labels[type]}
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-display font-bold">
-                {counts[type]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <ContentTypeTabs
+        active={contentType}
+        counts={counts}
+        onChange={(nextContentType) => updateParams({ contentType: nextContentType })}
+      />
 
       {videos.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div key={index} className="h-72 rounded-xl border surface-card animate-pulse" />
-          ))}
-        </div>
+        <LoadingGrid />
       ) : videos.isError ? (
-        <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-center text-muted-foreground max-w-xl mx-auto my-8">
-          <AlertTriangle className="size-8 text-rose-500 mx-auto mb-3" />
-          <h3 className="text-foreground font-semibold mb-1">動画データを取得できませんでした</h3>
-          <p className="text-xs mb-4">ネットワーク接続をご確認いただくか、もう一度お試しください。</p>
-          <button
-            onClick={() => videos.refetch()}
-            className="rounded-lg border border-rose-500/40 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
-          >
-            再試行する
-          </button>
-        </div>
-      ) : filteredList.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border surface-card px-5 py-16 text-center text-muted-foreground max-w-xl mx-auto my-8 text-sm">
-          <p className="font-semibold text-foreground mb-1">対象の動画がありませんでした</p>
-          <p className="text-xs mb-4">別の動画種別タブまたは比較期間をお試しください。</p>
-          <button
-            onClick={() => updateParams("standard", mode)}
-            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:border-info/60 hover:text-info transition-colors"
-          >
-            通常動画に戻る
-          </button>
-        </div>
+        <ErrorState onRetry={() => videos.refetch()} />
+      ) : videoList.length === 0 ? (
+        <EmptyState />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {paginatedList.map((video, index) => (
+            {videoList.map((video, index) => (
               <div key={video.videoId} className="relative">
                 <div className="absolute left-3 top-3 z-20 flex size-8 items-center justify-center rounded-lg border border-gold/40 bg-background/95 font-display font-extrabold text-gold text-xs shadow-md">
                   {index + 1}
@@ -189,26 +119,21 @@ function VideosTrendingPage() {
                   viewCount={video.currentViewCount}
                   channelName={video.channelName}
                   channelThumbnailUrl={video.channelThumbnailUrl}
-                  metric={
-                    video.hasTrend
-                      ? `+${video.viewDelta.toLocaleString("ja-JP")}回 / ${video.viewDeltaPct.toFixed(1)}%${
-                          video.isProvisional ? ` (${video.snapshotDays}日)` : ""
-                        }`
-                      : "データ蓄積中"
-                  }
+                  contentType={video.contentType}
+                  metric={videoTrendMetricLabel(video)}
                 />
               </div>
             ))}
           </div>
 
-          {visibleCount < filteredList.length && (
+          {videos.hasNextPage && (
             <div className="mt-8 text-center">
               <button
-                onClick={handleLoadMore}
-                disabled={isAppending}
+                onClick={() => videos.fetchNextPage()}
+                disabled={videos.isFetchingNextPage}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-2.5 text-sm font-semibold text-foreground hover:border-gold/60 hover:text-gold transition-colors disabled:opacity-50 min-w-40 justify-center"
               >
-                {isAppending ? (
+                {videos.isFetchingNextPage ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
                     読み込み中...
@@ -224,10 +149,91 @@ function VideosTrendingPage() {
 
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
         <TrendingUp className="size-4" />
-        増加率は参考表示で、順位は再生増加数で決まります。
+        順位は比較期間内の再生数増加で決まります。データが7日分そろっていない動画は暫定日数を併記します。
       </div>
     </div>
   );
+}
+
+export function useVideoTrendingUrlState(location: string) {
+  const params = new URLSearchParams(queryStringFromLocation(location));
+  const requestedMode = params.get("mode");
+  return {
+    mode: requestedMode === "7d" ? "7d" : "previous",
+    contentType: parseVideoContentType(params.get("contentType") ?? params.get("type")),
+  };
+}
+
+export function ContentTypeTabs({
+  active,
+  counts,
+  onChange,
+}: {
+  active: VideoContentTypeValue;
+  counts?: Partial<Record<VideoContentTypeValue, number>>;
+  onChange: (value: VideoContentTypeValue) => void;
+}) {
+  return (
+    <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap">
+      {VIDEO_CONTENT_TYPE_TABS.map((tab) => (
+        <button
+          key={tab.value}
+          onClick={() => onChange(tab.value)}
+          className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 ${
+            active === tab.value ? "border-gold text-gold" : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {tab.label}
+          {counts?.[tab.value] !== undefined && (
+            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-display font-bold">
+              {counts[tab.value]}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function LoadingGrid() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="h-72 rounded-xl border surface-card animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+export function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-center text-muted-foreground max-w-xl mx-auto my-8">
+      <AlertTriangle className="size-8 text-rose-500 mx-auto mb-3" />
+      <h3 className="text-foreground font-semibold mb-1">動画データを取得できませんでした</h3>
+      <p className="text-xs mb-4">通信状態を確認して、もう一度お試しください。</p>
+      <button
+        onClick={onRetry}
+        className="rounded-lg border border-rose-500/40 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
+      >
+        再試行する
+      </button>
+    </div>
+  );
+}
+
+export function EmptyState() {
+  return (
+    <div className="rounded-xl border border-dashed border-border surface-card px-5 py-16 text-center text-muted-foreground max-w-xl mx-auto my-8 text-sm">
+      <p className="font-semibold text-foreground mb-1">対象の動画がありません</p>
+      <p className="text-xs">別の動画種別または比較期間をお試しください。</p>
+    </div>
+  );
+}
+
+function queryStringFromLocation(location: string) {
+  const queryStart = location.indexOf("?");
+  if (queryStart >= 0) return location.slice(queryStart);
+  return typeof window === "undefined" ? "" : window.location.search;
 }
 
 export default VideosTrendingPage;
