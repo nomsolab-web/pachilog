@@ -5,7 +5,7 @@ import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnaps
 import { rateLimit } from "../middleware/rate-limit";
 import { isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { countMachineContentTypes } from "../lib/machine-content";
-import { isMachineVoteType, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
+import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
 import { selectComparisonSnapshots } from "../lib/ranking";
 
 export const machinesRoute = new Hono()
@@ -114,11 +114,14 @@ export const machinesRoute = new Hono()
     if (!Number.isInteger(id) || id < 1) return c.json({ error: "invalid machineId" }, 400);
     const [machine] = await db.select({ id: machines.id }).from(machines).where(eq(machines.id, id));
     if (!machine) return c.json({ error: "machine not found" }, 404);
-    let body: { voteType?: unknown; voterFingerprint?: unknown };
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ error: "invalid json" }, 400);
+    }
+    if (!isPlainRecord(body)) {
+      return c.json({ error: "invalid body" }, 400);
     }
     if (!isMachineVoteType(body.voteType) || !validateVoterFingerprint(body.voterFingerprint)) {
       return c.json({ error: "invalid body" }, 400);

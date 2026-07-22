@@ -3,6 +3,10 @@ export const MACHINE_VOTE_TYPES = ["want_to_play", "wait_and_see", "not_interest
 export type MachineVoteType = (typeof MACHINE_VOTE_TYPES)[number];
 export type MachineVoteStatus = "recorded" | "already_recorded" | "updated";
 
+export function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+}
+
 export function isMachineVoteType(value: unknown): value is MachineVoteType {
   return typeof value === "string" && (MACHINE_VOTE_TYPES as readonly string[]).includes(value);
 }
