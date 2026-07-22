@@ -174,23 +174,38 @@ export function ContentTypeTabs({
   onChange: (value: VideoContentTypeValue) => void;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap">
-      {VIDEO_CONTENT_TYPE_TABS.map((tab) => (
-        <button
-          key={tab.value}
-          onClick={() => onChange(tab.value)}
-          className={`pb-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 ${
-            active === tab.value ? "border-gold text-gold" : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {tab.label}
-          {counts?.[tab.value] !== undefined && (
-            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-display font-bold">
-              {counts[tab.value]}
-            </span>
-          )}
-        </button>
-      ))}
+    <div
+      className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
+    >
+      {VIDEO_CONTENT_TYPE_TABS.map((tab) => {
+        const isActive = active === tab.value;
+        const count = counts?.[tab.value];
+        const isZero = count === 0;
+
+        return (
+          <button
+            key={tab.value}
+            aria-pressed={isActive}
+            onClick={() => onChange(tab.value)}
+            className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:border-gold rounded-t-md ${
+              isActive
+                ? "border-gold text-gold opacity-100"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
+          >
+            {tab.label}
+            {count !== undefined && (
+              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
+                isActive
+                  ? "bg-gold/15 text-gold"
+                  : "bg-secondary text-muted-foreground"
+              } ${isZero ? "opacity-60" : ""}`}>
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -199,7 +214,7 @@ export function LoadingGrid() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="h-72 rounded-xl border surface-card animate-pulse" />
+        <div key={index} className="h-[345px] rounded-xl border surface-card animate-pulse" />
       ))}
     </div>
   );
@@ -224,7 +239,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
 export function EmptyState() {
   return (
     <div className="rounded-xl border border-dashed border-border surface-card px-5 py-16 text-center text-muted-foreground max-w-xl mx-auto my-8 text-sm">
-      <p className="font-semibold text-foreground mb-1">対象の動画がありません</p>
+      <p className="font-semibold text-foreground mb-1">この種別の動画はまだありません</p>
       <p className="text-xs">別の動画種別または比較期間をお試しください。</p>
     </div>
   );

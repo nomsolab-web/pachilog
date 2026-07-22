@@ -182,49 +182,75 @@ function MachinePage() {
           </div>
         </div>
 
-        <div className="mb-5 flex flex-wrap gap-2 border-b border-border pb-px">
-          {VIDEO_CONTENT_TYPE_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => updateContentType(tab.value)}
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all ${
-                contentType === tab.value
-                  ? "border-gold text-gold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {contentTypeCounts?.[tab.value] !== undefined && (
-                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                  {contentTypeCounts[tab.value]}
-                </span>
-              )}
-            </button>
-          ))}
+        <div
+          className="mb-5 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
+        >
+          {VIDEO_CONTENT_TYPE_TABS.map((tab) => {
+            const isActive = contentType === tab.value;
+            const count = contentTypeCounts?.[tab.value];
+            const isZero = count === 0;
+
+            return (
+              <button
+                key={tab.value}
+                aria-pressed={isActive}
+                onClick={() => updateContentType(tab.value)}
+                className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:border-gold rounded-t-md ${
+                  isActive
+                    ? "border-gold text-gold opacity-100"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
+              >
+                {tab.label}
+                {count !== undefined && (
+                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
+                    isActive
+                      ? "bg-gold/15 text-gold"
+                      : "bg-secondary text-muted-foreground"
+                  } ${isZero ? "opacity-60" : ""}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Category Tabs */}
         {mentions.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setVisibleCount(20);
-                }}
-                className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all ${
-                  activeTab === tab.id
-                    ? "border-info text-info"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                  {tab.count}
-                </span>
-              </button>
-            ))}
+          <div
+            className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
+          >
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const count = tab.count;
+              const isZero = count === 0;
+
+              return (
+                <button
+                  key={tab.id}
+                  aria-pressed={isActive}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setVisibleCount(20);
+                  }}
+                  className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-info/60 focus-visible:border-info rounded-t-md ${
+                    isActive
+                      ? "border-info text-info opacity-100"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
+                >
+                  {tab.label}
+                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
+                    isActive
+                      ? "bg-info/15 text-info"
+                      : "bg-secondary text-muted-foreground"
+                  } ${isZero ? "opacity-60" : ""}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
