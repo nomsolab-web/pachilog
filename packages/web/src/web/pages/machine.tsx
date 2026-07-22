@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
-import { useParams, Link } from "wouter";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX } from "lucide-react";
 import { api } from "../lib/api";
 import { MachineVoteWidget } from "../components/machine-vote-widget";
 import { VideoCard } from "../components/video-card";
+import {
+  VIDEO_CONTENT_TYPE_TABS,
+  machineDetailQueryParams,
+  parseVideoContentType,
+  updateContentTypeSearchParams,
+  type VideoContentTypeValue,
+} from "../lib/video-content-types";
 
 type SortMode = "newest" | "views";
 type VideoMention = {
@@ -14,17 +21,40 @@ type VideoMention = {
   publishedAt: string | null;
   channelName: string;
   channelThumbnailUrl: string | null;
+  contentType: VideoContentTypeValue;
 };
 
 function MachinePage() {
   const { id } = useParams<{ id: string }>();
+  const [location, setLocation] = useLocation();
+  const [, startTransition] = useTransition();
+  const [path] = location.split("?");
+  const contentType = parseVideoContentType(new URLSearchParams(queryStringFromLocation(location)).get("contentType"));
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [visibleCount, setVisibleCount] = useState(20);
 
   const detail = useQuery({
-    queryKey: ["machine", id],
-    queryFn: async () => (await api.machines[":id"].$get({ param: { id } })).json(),
+    queryKey: ["machine", id, contentType],
+    queryFn: async () => (await api.machines[":id"].$get({ param: { id }, query: machineDetailQueryParams(contentType) })).json(),
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(queryStringFromLocation(location));
+    const rawContentType = params.get("contentType");
+    if (rawContentType && rawContentType !== contentType) {
+      params.set("contentType", contentType);
+      params.delete("cursor");
+      setLocation(`${path || `/machines/${id}`}?${params.toString()}`, { replace: true });
+    }
+  }, [contentType, id, location, path, setLocation]);
+
+  const updateContentType = (nextContentType: VideoContentTypeValue) => {
+    startTransition(() => {
+      const params = updateContentTypeSearchParams(queryStringFromLocation(location), nextContentType, { resetCursor: true });
+      setVisibleCount(20);
+      setLocation(`${path || `/machines/${id}`}?${params.toString()}`);
+    });
+  };
 
   const mentions = useMemo(() => {
     if (!detail.data || "error" in detail.data) return [];
@@ -120,6 +150,7 @@ function MachinePage() {
   }
 
   const { machine, summary } = detail.data;
+  const contentTypeCounts = detail.data.contentTypeCounts;
   const activeGroupVideos = tabs.find(t => t.id === activeTab)?.data || [];
   const visibleMentions = activeGroupVideos.slice(0, visibleCount);
 
@@ -203,6 +234,27 @@ function MachinePage() {
           </div>
         </div>
 
+        <div className="mb-5 flex flex-wrap gap-2 border-b border-border pb-px">
+          {VIDEO_CONTENT_TYPE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => updateContentType(tab.value)}
+              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all ${
+                contentType === tab.value
+                  ? "border-gold text-gold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              {contentTypeCounts?.[tab.value] !== undefined && (
+                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {contentTypeCounts[tab.value]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Category Tabs */}
         {mentions.length > 0 && (
           <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-px">
@@ -252,6 +304,7 @@ function MachinePage() {
                   viewCount={mention.viewCount}
                   channelName={mention.channelName}
                   channelThumbnailUrl={mention.channelThumbnailUrl}
+                  contentType={mention.contentType}
                 />
               ))}
             </div>
@@ -281,6 +334,12 @@ function formatDate(value: string | null | undefined) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" }).format(date);
+}
+
+function queryStringFromLocation(location: string) {
+  const queryStart = location.indexOf("?");
+  if (queryStart >= 0) return location.slice(queryStart);
+  return typeof window === "undefined" ? "" : window.location.search;
 }
 
 export default MachinePage;
