@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ArrowDown, ArrowUp, Users, Youtube } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Users, Youtube } from "lucide-react";
 import { formatJapaneseCount } from "../lib/format";
 import { getYouTubeChannelUrl } from "../lib/youtube";
 import { ChannelAvatar } from "./channel-avatar";
@@ -34,16 +34,34 @@ export function RankingCard({
   isProvisional,
 }: Props) {
   const hasTrend = snapshotCount > 1;
-  const rising = delta >= 0;
   const youtubeUrl = getYouTubeChannelUrl({ handle, youtubeChannelId });
-  const trendClass = hasTrend
-    ? rising
-      ? "text-rise bg-rise/10"
-      : "text-fall bg-fall/10"
+  const trendType = !hasTrend
+    ? "none"
+    : delta > 0
+    ? "up"
+    : delta < 0
+    ? "down"
+    : "flat";
+
+  const trendClass = trendType === "up"
+    ? "text-rise bg-rise/10 border border-rise/20"
+    : trendType === "down"
+    ? "text-fall bg-fall/10 border border-fall/20"
+    : trendType === "flat"
+    ? "text-muted-foreground bg-secondary/80 border border-border"
     : "info-badge";
 
-  const formattedDelta = delta >= 0 ? `+${formatJapaneseCount(delta, "人")}` : formatJapaneseCount(delta, "人");
-  const formattedPct = `${deltaPct >= 0 ? "+" : ""}${deltaPct.toFixed(1)}%`;
+  const formattedDelta = delta > 0
+    ? `+${formatJapaneseCount(delta, "人")}`
+    : delta < 0
+    ? `${formatJapaneseCount(delta, "人")}`
+    : "±0人";
+
+  const formattedPct = delta > 0
+    ? `+${deltaPct.toFixed(1)}%`
+    : delta < 0
+    ? `${deltaPct.toFixed(1)}%`
+    : "0.0%";
 
   return (
     <div className="interactive-card flex items-center gap-3 rounded-xl border px-3 sm:px-4 py-3">
@@ -67,7 +85,9 @@ export function RankingCard({
         {hasTrend ? (
           <>
             <div className="flex items-center gap-1 font-bold text-xs sm:text-sm">
-              {rising ? <ArrowUp className="size-3.5 shrink-0" /> : <ArrowDown className="size-3.5 shrink-0" />}
+              {trendType === "up" && <ArrowUp className="size-3.5 shrink-0" />}
+              {trendType === "down" && <ArrowDown className="size-3.5 shrink-0" />}
+              {trendType === "flat" && <Minus className="size-3.5 shrink-0 text-muted-foreground" />}
               <span>{formattedDelta}</span>
             </div>
             <div className="text-[11px] sm:text-xs font-semibold opacity-90">

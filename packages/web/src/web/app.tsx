@@ -11,6 +11,7 @@ import AboutPage from "./pages/about";
 import MethodologyPage from "./pages/methodology";
 import PrivacyPage from "./pages/privacy";
 import ContactPage from "./pages/contact";
+import NotFoundPage from "./pages/not-found";
 import { Layout } from "./components/layout";
 import { Provider } from "./components/provider";
 
@@ -31,6 +32,7 @@ function App() {
           <Route path="/methodology" component={MethodologyPage} />
           <Route path="/privacy" component={PrivacyPage} />
           <Route path="/contact" component={ContactPage} />
+          <Route component={NotFoundPage} />
         </Switch>
       </Layout>
     </Provider>
