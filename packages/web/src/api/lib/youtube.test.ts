@@ -86,7 +86,7 @@ describe("YouTube collection helpers", () => {
   });
 
   test("validates seed categories", () => {
-    expect(SEED_CHANNELS).toHaveLength(114);
+    expect(SEED_CHANNELS).toHaveLength(119);
     expect(SEED_CHANNELS.every((channel) => isValidChannelCategory(channel.category))).toBe(true);
   });
 });

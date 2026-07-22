@@ -125,4 +125,9 @@ export const SEED_CHANNELS: readonly SeedChannel[] = [
   { youtubeChannelId: "UCtbKZWfVR0dEO4Cwbh-Y4mQ", name: "パーラーあげ実のそれでもしたい", category: "other", active: true },
   { youtubeChannelId: "UCYW2YGDhRQGcDkafCsCdDaw", name: "野坂の仕事終わりパチスロ実践ch", category: "other", active: true },
   { youtubeChannelId: "UC6bPENYHx_8jdHWysh8z3dQ", name: "ぱちラボ", category: "other", active: true },
+  { youtubeChannelId: "UCpUliOaNXv7xifckVnD_8ZA", name: "しらぬいの日常チャンネル", category: "individual", active: true },
+  { youtubeChannelId: "UCfA6ZvYUQ2UBHPRfkGncrJg", name: "ひろしちゃんねる", category: "individual", active: true },
+  { youtubeChannelId: "UCmOiUTK2pZJODKnNzftnMGQ", name: "ハチミツ横綱慶次社長", category: "individual", active: true },
+  { youtubeChannelId: "UCqdq35U9lK3c51Vg3Iwap_Q", name: "しゅんすけTV", category: "individual", active: true },
+  { youtubeChannelId: "UC0AapfWC6zl_8clEgD85gMg", name: "嫁ちゃんをスロットに誘って一緒に打ちに行きたいチャンネル", category: "individual", active: true },
 ] as const satisfies readonly SeedChannel[];
