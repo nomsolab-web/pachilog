@@ -26,6 +26,7 @@ const CATEGORY_OPTIONS = [
 function Index() {
   const [period, setPeriod] = useState<7 | 30 | 90>(7);
   const [tab, setTab] = useState<"rising" | "falling">("rising");
+  const [sortBy, setSortBy] = useState<"count" | "rate">("count");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORY_OPTIONS)[number]["value"]>("all");
 
@@ -38,7 +39,25 @@ function Index() {
     queryFn: async () => (await api.videos.trending.$get({ query: { mode: "previous" } })).json(),
   });
 
-  const list = rankings.data ? (tab === "rising" ? rankings.data.rising : rankings.data.falling) : [];
+  const list = useMemo(() => {
+    if (!rankings.data) return [];
+    const baseList = tab === "rising" ? [...rankings.data.rising] : [...rankings.data.falling];
+    
+    return baseList.sort((a, b) => {
+      if (tab === "rising") {
+        if (sortBy === "count") {
+          return b.delta - a.delta || a.name.localeCompare(b.name, "ja");
+        }
+        return b.deltaPct - a.deltaPct || b.delta - a.delta || a.name.localeCompare(b.name, "ja");
+      } else {
+        if (sortBy === "count") {
+          return a.delta - b.delta || a.name.localeCompare(b.name, "ja");
+        }
+        return a.deltaPct - b.deltaPct || a.delta - b.delta || a.name.localeCompare(b.name, "ja");
+      }
+    });
+  }, [rankings.data, tab, sortBy]);
+
   const visibleList = list
     .filter((entry) => (category === "all" ? true : entry.category === category))
     .filter((entry) => entry.name.toLowerCase().includes(query.trim().toLowerCase()))
@@ -109,26 +128,47 @@ function Index() {
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div className="segmented-control flex gap-1 rounded-lg border p-1">
-            <button
-              onClick={() => setTab("rising")}
-              className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
-                tab === "rising" ? "segmented-button-active bg-rise/15 text-rise" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <TrendingUp className="size-4" />
-              急上昇
-            </button>
-            <button
-              onClick={() => setTab("falling")}
-              className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
-                tab === "falling" ? "segmented-button-active bg-fall/15 text-fall" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <TrendingDown className="size-4" />
-              急下降
-            </button>
+        <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="segmented-control flex gap-1 rounded-lg border p-1">
+              <button
+                onClick={() => setTab("rising")}
+                className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  tab === "rising" ? "segmented-button-active bg-rise/15 text-rise" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <TrendingUp className="size-4" />
+                登録者増加
+              </button>
+              <button
+                onClick={() => setTab("falling")}
+                className={`segmented-button flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  tab === "falling" ? "segmented-button-active bg-fall/15 text-fall" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <TrendingDown className="size-4" />
+                急下降
+              </button>
+            </div>
+
+            <div className="segmented-control flex gap-1 rounded-lg border p-1">
+              <button
+                onClick={() => setSortBy("count")}
+                className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  sortBy === "count" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                増加数順
+              </button>
+              <button
+                onClick={() => setSortBy("rate")}
+                className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
+                  sortBy === "rate" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                伸び率順
+              </button>
+            </div>
           </div>
 
           <div className="segmented-control flex gap-1 rounded-lg border p-1">
