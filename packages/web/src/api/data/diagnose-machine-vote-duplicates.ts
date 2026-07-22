@@ -2,6 +2,16 @@ import { sql } from "drizzle-orm";
 import { db } from "../database";
 
 async function main() {
+  const tables = await db.all<{ name: string }>(sql`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table' AND name = 'machine_votes'
+  `);
+  if (tables.length === 0) {
+    console.log("machine_votes table does not exist yet. It is safe to continue with initial migrations.");
+    return;
+  }
+
   const duplicates = await db.all<{
     machineId: number;
     voterFingerprint: string;
