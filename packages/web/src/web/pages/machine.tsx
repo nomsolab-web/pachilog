@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Eye, ExternalLink, Factory, Film, SearchX } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX } from "lucide-react";
 import { api } from "../lib/api";
-import { ChannelAvatar } from "../components/channel-avatar";
 import { MachineVoteWidget } from "../components/machine-vote-widget";
+import { VideoCard } from "../components/video-card";
 
 type SortMode = "newest" | "views";
 type VideoMention = {
@@ -243,7 +243,16 @@ function MachinePage() {
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               {visibleMentions.map((mention) => (
-                <VideoCard key={mention.videoId} mention={mention as VideoMention} />
+                <VideoCard
+                  key={mention.videoId}
+                  videoId={mention.videoId}
+                  title={mention.videoTitle}
+                  thumbnailUrl={null}
+                  publishedAt={mention.publishedAt}
+                  viewCount={mention.viewCount}
+                  channelName={mention.channelName}
+                  channelThumbnailUrl={mention.channelThumbnailUrl}
+                />
               ))}
             </div>
             {visibleCount < activeGroupVideos.length && (
@@ -260,52 +269,6 @@ function MachinePage() {
         )}
       </section>
     </div>
-  );
-}
-
-function VideoCard({ mention }: { mention: VideoMention }) {
-  // Validate that video ID only contains safe YouTube ID characters
-  const safeVideoId = /^[a-zA-Z0-9_-]+$/.test(mention.videoId) ? mention.videoId : "";
-  const youtubeUrl = safeVideoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(safeVideoId)}` : "#";
-  const thumbnailUrl = safeVideoId ? `https://i.ytimg.com/vi/${encodeURIComponent(safeVideoId)}/hqdefault.jpg` : "";
-
-  return (
-    <article className="interactive-card overflow-hidden rounded-xl border">
-      <a
-        href={youtubeUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${mention.videoTitle} をYouTubeで見る`}
-        className="block"
-      >
-        {thumbnailUrl && (
-          <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-video w-full object-cover bg-secondary" />
-        )}
-      </a>
-      <div className="p-4">
-        <h3 className="line-clamp-2 min-h-11 font-semibold leading-snug">{mention.videoTitle}</h3>
-        <div className="mt-3 flex items-center gap-2">
-          <ChannelAvatar name={mention.channelName} thumbnailUrl={mention.channelThumbnailUrl} className="size-8 rounded-full" />
-          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{mention.channelName}</p>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-          <span>{formatDate(mention.publishedAt)}</span>
-          <span className="inline-flex items-center gap-1">
-            <Eye className="size-3.5" />
-            {mention.viewCount.toLocaleString("ja-JP")}回
-          </span>
-        </div>
-        <a
-          href={youtubeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-1.5 text-sm font-semibold text-gold hover:bg-gold/10"
-        >
-          YouTubeで見る
-          <ExternalLink className="size-3.5" />
-        </a>
-      </div>
-    </article>
   );
 }
 
