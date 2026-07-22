@@ -50,7 +50,7 @@ jobs:
             --days="${{ inputs.days }}" \
             --limit="${{ inputs.limit }}" \
             --min-videos="${{ github.event.inputs['min-videos'] }}" \
-            --output="${OUTPUT_FILE}"
+            --output="../../${OUTPUT_FILE}"
           test -s "${OUTPUT_FILE}"
 
       - name: Write summary
