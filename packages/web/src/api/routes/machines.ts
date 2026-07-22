@@ -4,6 +4,7 @@ import { db } from "../database";
 import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
 import { isVideoContentType, type VideoContentType } from "../lib/content-type";
+import { countMachineContentTypes } from "../lib/machine-content";
 import { selectComparisonSnapshots } from "../lib/ranking";
 
 export const machinesRoute = new Hono()
@@ -57,7 +58,7 @@ export const machinesRoute = new Hono()
     const [machine] = await db.select().from(machines).where(eq(machines.id, id));
     if (!machine) return c.json({ error: "not found" }, 404);
 
-    const mentions = await db
+    const linkedVideos = await db
       .select({
         id: videos.id,
         videoId: videos.videoId,
@@ -68,6 +69,7 @@ export const machinesRoute = new Hono()
         publishedAt: videos.publishedAt,
         updatedAt: videos.updatedAt,
         contentType: videos.contentType,
+        matchMethod: videoMachineLinks.matchMethod,
         channelId: channels.id,
         channelName: channels.name,
         channelThumbnailUrl: channels.thumbnailUrl,
@@ -75,9 +77,10 @@ export const machinesRoute = new Hono()
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
       .innerJoin(channels, eq(videos.channelId, channels.id))
-      .where(and(eq(videoMachineLinks.machineId, id), inArray(videos.contentType, contentTypes)))
+      .where(and(eq(videoMachineLinks.machineId, id), ne(videoMachineLinks.matchMethod, "manual_excluded")))
       .orderBy(desc(videos.viewCount));
 
+    const mentions = linkedVideos.filter((video) => contentTypes.includes(video.contentType));
     const uniqueMentions = [...new Map(mentions.map((mention) => [mention.videoId, mention])).values()];
     const publishedDates = uniqueMentions.map((mention) => mention.publishedAt).filter((value): value is string => !!value).sort();
 
@@ -86,7 +89,7 @@ export const machinesRoute = new Hono()
         machine,
         mentions: uniqueMentions,
         contentTypes,
-        contentTypeCounts: countContentTypes(mentions),
+        contentTypeCounts: countMachineContentTypes(linkedVideos),
         summary: {
           videoCount: uniqueMentions.length,
           totalViews: uniqueMentions.reduce((sum, mention) => sum + mention.viewCount, 0),
@@ -149,10 +152,4 @@ function parseContentTypes(value: string): VideoContentType[] {
     .map((item) => item.trim())
     .filter(isVideoContentType);
   return parsed.length > 0 ? parsed : ["standard"];
-}
-
-function countContentTypes(rows: { contentType: VideoContentType }[]) {
-  const counts: Record<VideoContentType, number> = { standard: 0, short: 0, live: 0, promotion: 0, unknown: 0 };
-  for (const row of rows) counts[row.contentType] += 1;
-  return counts;
 }

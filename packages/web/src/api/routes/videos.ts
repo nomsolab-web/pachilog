@@ -3,8 +3,9 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../database";
 import { channels, videos, videoSnapshots } from "../database/schema";
 import { isVideoContentType, type VideoContentType } from "../lib/content-type";
-import { clampLimit, parseOffsetCursor } from "../lib/pagination";
+import { clampLimit } from "../lib/pagination";
 import { selectComparisonSnapshots } from "../lib/ranking";
+import { decodeVideoRankingCursor, paginateVideoRanking, sortVideoRankingEntries } from "../lib/video-ranking";
 
 const MODES = new Set(["previous", "7d"]);
 const MAX_LIMIT = 100;
@@ -14,7 +15,7 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
   const mode = MODES.has(requestedMode) ? requestedMode : "previous";
   const period = mode === "7d" ? 7 : 1;
   const limit = clampLimit(c.req.query("limit"), 50, MAX_LIMIT);
-  const offset = parseOffsetCursor(c.req.query("cursor"));
+  const cursor = decodeVideoRankingCursor(c.req.query("cursor"));
   const contentTypes = parseContentTypes(c.req.query("contentType") ?? "standard");
   const where = contentTypes.length === 1 ? eq(videos.contentType, contentTypes[0]) : inArray(videos.contentType, contentTypes);
 
@@ -36,12 +37,9 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
     .from(videos)
     .innerJoin(channels, eq(videos.channelId, channels.id))
     .where(where)
-    .orderBy(desc(videos.viewCount))
-    .limit(limit + 1)
-    .offset(offset);
+    .orderBy(desc(videos.viewCount));
 
-  const pageRows = videoRows.slice(0, limit);
-  const videoIds = pageRows.map((video) => video.videoId);
+  const videoIds = videoRows.map((video) => video.videoId);
   const snapshotRows =
     videoIds.length > 0
       ? await db
@@ -57,7 +55,7 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
     snapshotsByVideoId.set(snapshot.videoId, list);
   }
 
-  const entries = pageRows.map((video) => {
+  const entries = videoRows.map((video) => {
       const snapshots = snapshotsByVideoId.get(video.videoId) ?? [];
       const comparable = snapshots.map((snapshot) => ({
         date: snapshot.date,
@@ -87,9 +85,8 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
       };
     });
 
-  const ranked = entries
-    .filter((entry) => entry.viewDelta > 0)
-    .sort((a, b) => b.viewDelta - a.viewDelta || b.currentViewCount - a.currentViewCount);
+  const ranked = sortVideoRankingEntries(entries.filter((entry) => entry.viewDelta > 0));
+  const page = paginateVideoRanking(ranked, limit, cursor);
   const counts = await contentTypeCounts();
   return c.json(
     {
@@ -97,9 +94,9 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
       period,
       contentTypes,
       limit,
-      nextCursor: videoRows.length > limit ? String(offset + limit) : null,
+      nextCursor: page.nextCursor,
       counts,
-      videos: ranked,
+      videos: page.page,
       queryPlan: { videos: 1, snapshots: 1, contentTypeCounts: 1 },
     },
     200,
