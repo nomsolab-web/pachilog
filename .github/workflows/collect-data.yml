@@ -43,6 +43,8 @@ jobs:
             fi
           done
       - run: bun install --frozen-lockfile
+      - name: Check machine vote duplicates before migrations
+        run: bun run --cwd packages/web data:diagnose-machine-vote-duplicates
       - name: Initialize database
         run: |
           bun run --cwd packages/web db:migrate

@@ -50,6 +50,13 @@ export const videos = sqliteTable("videos", {
   viewCount: integer("view_count").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
   commentCount: integer("comment_count").notNull().default(0),
+  contentType: text("content_type", { enum: ["standard", "short", "live", "promotion", "unknown"] })
+    .notNull()
+    .default("unknown"),
+  contentTypeReason: text("content_type_reason"),
+  contentTypeConfidence: integer("content_type_confidence").notNull().default(0),
+  durationSeconds: integer("duration_seconds"),
+  liveBroadcastContent: text("live_broadcast_content"),
   matchStatus: text("match_status", { enum: ["pending", "matched", "unmatched", "manual_excluded"] })
     .notNull()
     .default("pending"),
@@ -159,17 +166,21 @@ export const machineVideoJudgments = sqliteTable(
   (table) => [uniqueIndex("machine_video_judgment_key_idx").on(table.judgmentKey)],
 );
 
-export const machineVotes = sqliteTable("machine_votes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  machineId: integer("machine_id")
-    .notNull()
-    .references(() => machines.id, { onDelete: "cascade" }),
-  voteType: text("vote_type", { enum: ["want_to_play", "wait_and_see", "not_interested"] }).notNull(),
-  voterFingerprint: text("voter_fingerprint").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const machineVotes = sqliteTable(
+  "machine_votes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    machineId: integer("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    voteType: text("vote_type", { enum: ["want_to_play", "wait_and_see", "not_interested"] }).notNull(),
+    voterFingerprint: text("voter_fingerprint").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [uniqueIndex("machine_vote_fingerprint_idx").on(table.machineId, table.voterFingerprint)],
+);
 
 // --- Weekly summary articles (SEO long-tail content, auto-generated from collected data) ---
 export const weeklySummaries = sqliteTable("weekly_summaries", {

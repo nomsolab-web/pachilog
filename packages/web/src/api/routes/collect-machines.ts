@@ -12,6 +12,7 @@ import {
 } from "../lib/youtube";
 import { findDetailedMachineMatches } from "../lib/machine-match";
 import { buildAiCandidates, runAiMachineJudgments, type AiCandidate } from "../lib/machine-ai";
+import { classifyVideoContent } from "../lib/content-type";
 
 export const collectMachines = new Hono().post("/run", async (c) => {
   const secret = c.req.header("x-collect-secret");
@@ -90,6 +91,12 @@ export const collectMachines = new Hono().post("/run", async (c) => {
         if (!stat) continue;
 
         const existingVideo = existingVideosMap.get(video.videoId);
+        const classification = classifyVideoContent({
+          title: video.title,
+          durationSeconds: stat.durationSeconds,
+          liveBroadcastContent: stat.liveBroadcastContent,
+          channelCategory: ch.category,
+        });
         if (existingVideo) {
           // Only update if stats or basic fields changed to avoid unnecessary writes
           const needsUpdate =
@@ -97,7 +104,10 @@ export const collectMachines = new Hono().post("/run", async (c) => {
             existingVideo.thumbnailUrl !== video.thumbnailUrl ||
             existingVideo.viewCount !== stat.viewCount ||
             existingVideo.likeCount !== stat.likeCount ||
-            existingVideo.commentCount !== stat.commentCount;
+            existingVideo.commentCount !== stat.commentCount ||
+            existingVideo.contentType !== classification.contentType ||
+            existingVideo.durationSeconds !== stat.durationSeconds ||
+            existingVideo.liveBroadcastContent !== stat.liveBroadcastContent;
 
           if (needsUpdate) {
             await db
@@ -110,6 +120,11 @@ export const collectMachines = new Hono().post("/run", async (c) => {
                 viewCount: stat.viewCount,
                 likeCount: stat.likeCount,
                 commentCount: stat.commentCount,
+                contentType: classification.contentType,
+                contentTypeReason: classification.reason,
+                contentTypeConfidence: classification.confidence,
+                durationSeconds: stat.durationSeconds,
+                liveBroadcastContent: stat.liveBroadcastContent,
                 updatedAt: new Date(),
               })
               .where(eq(videosTable.id, existingVideo.id));
@@ -124,6 +139,11 @@ export const collectMachines = new Hono().post("/run", async (c) => {
             viewCount: stat.viewCount,
             likeCount: stat.likeCount,
             commentCount: stat.commentCount,
+            contentType: classification.contentType,
+            contentTypeReason: classification.reason,
+            contentTypeConfidence: classification.confidence,
+            durationSeconds: stat.durationSeconds,
+            liveBroadcastContent: stat.liveBroadcastContent,
           });
         }
         results.videosUpserted += 1;
@@ -241,6 +261,22 @@ export const collectMachines = new Hono().post("/run", async (c) => {
               commentCount: stat.commentCount,
               publishedAt: video.publishedAt,
             });
+            results.mentionsUpserted += 1;
+          }
+        } else {
+          for (const link of mentionActiveLinks) {
+            await db
+              .update(machineMentions)
+              .set({
+                channelId: ch.id,
+                videoTitle: video.title,
+                viewCount: stat.viewCount,
+                likeCount: stat.likeCount,
+                commentCount: stat.commentCount,
+                publishedAt: video.publishedAt,
+                updatedAt: new Date(),
+              })
+              .where(and(eq(machineMentions.machineId, link.machineId), eq(machineMentions.videoId, video.videoId)));
             results.mentionsUpserted += 1;
           }
         }
