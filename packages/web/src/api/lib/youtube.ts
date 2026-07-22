@@ -135,6 +135,8 @@ export type VideoStats = {
   viewCount: number;
   likeCount: number;
   commentCount: number;
+  durationSeconds: number | null;
+  liveBroadcastContent: string | null;
 };
 
 export async function fetchUploadsPlaylistId(channelId: string): Promise<string | null> {
@@ -159,7 +161,7 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
   const results: VideoStats[] = [];
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
-    const url = `${YT_API_BASE}/videos?part=statistics&id=${batch.join(",")}&key=${apiKey()}`;
+    const url = `${YT_API_BASE}/videos?part=statistics,contentDetails,snippet&id=${batch.join(",")}&key=${apiKey()}`;
     const data = await withYoutubeRetry(() => youtubeJson(url, "video statistics lookup"));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const item of data.items ?? []) {
@@ -168,10 +170,22 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
         viewCount: Number(item.statistics?.viewCount ?? 0),
         likeCount: Number(item.statistics?.likeCount ?? 0),
         commentCount: Number(item.statistics?.commentCount ?? 0),
+        durationSeconds: parseYoutubeDuration(item.contentDetails?.duration),
+        liveBroadcastContent: item.snippet?.liveBroadcastContent ?? null,
       });
     }
   }
   return results;
+}
+
+export function parseYoutubeDuration(duration: string | null | undefined) {
+  if (!duration) return null;
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(duration);
+  if (!match) return null;
+  const hours = Number(match[1] ?? 0);
+  const minutes = Number(match[2] ?? 0);
+  const seconds = Number(match[3] ?? 0);
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

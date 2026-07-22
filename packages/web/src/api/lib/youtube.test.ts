@@ -5,6 +5,7 @@ import {
   chunkArray,
   fetchChannelsByIdsSafe,
   isSuccessfulCollectionRate,
+  parseYoutubeDuration,
   selectChannelThumbnailUrl,
   withYoutubeRetry,
   YoutubeApiError,
@@ -78,6 +79,13 @@ describe("YouTube collection helpers", () => {
     );
     expect(selectChannelThumbnailUrl({ default: { url: "default.jpg" } })).toBe("default.jpg");
     expect(selectChannelThumbnailUrl(undefined)).toBeNull();
+  });
+
+  test("parses YouTube ISO 8601 durations", () => {
+    expect(parseYoutubeDuration("PT1H2M3S")).toBe(3723);
+    expect(parseYoutubeDuration("PT59S")).toBe(59);
+    expect(parseYoutubeDuration("PT12M")).toBe(720);
+    expect(parseYoutubeDuration(undefined)).toBeNull();
   });
 
   test("prevents duplicate snapshots for the same day", () => {
