@@ -55,3 +55,22 @@ bun run db:studio     # Drizzle Studioでデータ確認
 
 `POST /api/collect/run` と `POST /api/collect-machines/run` を、n8nなど外部のCronから毎日1回叩く。
 ヘッダー `x-collect-secret` に `.env` の `COLLECT_SECRET_TOKEN` と同じ値を設定すること。詳細は [SPEC.md](./SPEC.md#データ収集運用) を参照。
+## YouTubeチャンネル候補発見
+
+固定seedへ直接追加する前に、人間が確認するための候補JSONを生成します。この処理はDB更新を行わず、seedや既存データも変更しません。
+
+```bash
+YOUTUBE_API_KEY=... bun run channels:discover
+```
+
+標準では直近60日、検索語5件、候補100件、最低2動画で `channel-candidates.json` を出力します。
+
+```bash
+bun run channels:discover --days=60 --limit=100 --min-videos=2 --output=channel-candidates.json
+```
+
+必要な環境変数は `YOUTUBE_API_KEY` です。`DATABASE_URL` と `DATABASE_AUTH_TOKEN` がある場合は、DBの `channels` に登録済みの `youtube_channel_id` も除外に使います。なくてもseed登録済みチャンネルは除外されます。
+
+GitHub Actions では `Discover YouTube channel candidates` workflow を手動実行します。`days`、`limit`、`min-videos` を指定でき、結果は `channel-candidates` Artifact と Actions Summary で確認できます。生成ファイルは自動コミットされません。
+
+YouTube APIクォータは、標準検索語5件の場合 `search.list` が5回で最低約500クォータを消費します。加えて候補チャンネル詳細取得の `channels.list` が50件バッチごとに少量消費されます。

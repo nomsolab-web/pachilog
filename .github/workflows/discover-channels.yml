@@ -1,0 +1,95 @@
+name: Discover YouTube channel candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Look back this many days"
+        required: true
+        default: "60"
+      limit:
+        description: "Maximum candidates to keep"
+        required: true
+        default: "100"
+      min-videos:
+        description: "Minimum discovered videos per channel"
+        required: true
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    environment: pachilog_secret
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      OUTPUT_FILE: channel-candidates.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          if [ -z "${YOUTUBE_API_KEY}" ]; then
+            echo "Missing required GitHub Actions secret: YOUTUBE_API_KEY" >&2
+            exit 1
+          fi
+
+      - run: bun install --frozen-lockfile
+
+      - name: Discover channel candidates
+        shell: bash
+        run: |
+          bun run channels:discover \
+            --days="${{ inputs.days }}" \
+            --limit="${{ inputs.limit }}" \
+            --min-videos="${{ github.event.inputs['min-videos'] }}" \
+            --output="${OUTPUT_FILE}"
+          test -s "${OUTPUT_FILE}"
+
+      - name: Write summary
+        shell: bash
+        run: |
+          bun -e '
+            const data = await Bun.file(process.env.OUTPUT_FILE).json();
+            const candidates = data.candidates ?? [];
+            const conditions = data.searchConditions ?? {};
+            const lines = [
+              "## YouTube channel candidates",
+              "",
+              `Candidates: ${candidates.length}`,
+              "",
+              "### Conditions",
+              "",
+              `- days: ${conditions.days}`,
+              `- limit: ${conditions.limit}`,
+              `- min-videos: ${conditions.minVideos}`,
+              `- queries: ${(conditions.queries ?? []).join(", ")}`,
+              `- publishedAfter: ${conditions.publishedAfter}`,
+              "",
+              "### Top candidates",
+              "",
+              "| Rank | Channel | Videos | Queries | Subscribers | Score |",
+              "|---:|---|---:|---:|---:|---:|",
+              ...candidates.slice(0, 10).map((candidate, index) => {
+                const subscribers = candidate.subscriberCount ?? "private";
+                const title = String(candidate.title ?? "").replaceAll("|", "\\|");
+                return `| ${index + 1} | [${title}](${candidate.channelUrl}) | ${candidate.matchedVideoCount} | ${candidate.matchedQueries.length} | ${subscribers} | ${candidate.score} |`;
+              }),
+            ];
+            await Bun.write(process.env.GITHUB_STEP_SUMMARY, `${lines.join("\n")}\n`);
+          '
+
+      - name: Upload candidates artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: channel-candidates
+          path: channel-candidates.json
+          retention-days: 10
+          if-no-files-found: error
