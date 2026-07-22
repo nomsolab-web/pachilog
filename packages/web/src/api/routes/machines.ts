@@ -5,6 +5,7 @@ import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnaps
 import { rateLimit } from "../middleware/rate-limit";
 import { isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { countMachineContentTypes } from "../lib/machine-content";
+import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
 import { selectComparisonSnapshots } from "../lib/ranking";
 
 export const machinesRoute = new Hono()
@@ -113,27 +114,41 @@ export const machinesRoute = new Hono()
     if (!Number.isInteger(id) || id < 1) return c.json({ error: "invalid machineId" }, 400);
     const [machine] = await db.select({ id: machines.id }).from(machines).where(eq(machines.id, id));
     if (!machine) return c.json({ error: "machine not found" }, 404);
-    const body = await c.req.json<{
-      voteType: "want_to_play" | "wait_and_see" | "not_interested";
-      voterFingerprint: string;
-    }>();
-    if (
-      ["want_to_play", "wait_and_see", "not_interested"].includes(body.voteType) === false ||
-      typeof body.voterFingerprint !== "string" ||
-      body.voterFingerprint.length < 8 ||
-      body.voterFingerprint.length > 256
-    ) {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid json" }, 400);
+    }
+    if (!isPlainRecord(body)) {
       return c.json({ error: "invalid body" }, 400);
     }
-    await db
+    if (!isMachineVoteType(body.voteType) || !validateVoterFingerprint(body.voterFingerprint)) {
+      return c.json({ error: "invalid body" }, 400);
+    }
+    const inserted = await db
       .insert(machineVotes)
       .values({ machineId: id, voteType: body.voteType, voterFingerprint: body.voterFingerprint })
-      .onConflictDoUpdate({
-        target: [machineVotes.machineId, machineVotes.voterFingerprint],
-        set: { voteType: body.voteType },
-      });
+      .onConflictDoNothing()
+      .returning({ id: machineVotes.id });
 
-    return c.json({ ok: true, status: "recorded" }, 200);
+    if (inserted.length > 0) {
+      return c.json({ ok: true, status: "recorded" }, 201);
+    }
+
+    const [existingVote] = await db
+      .select({ voteType: machineVotes.voteType })
+      .from(machineVotes)
+      .where(and(eq(machineVotes.machineId, id), eq(machineVotes.voterFingerprint, body.voterFingerprint)));
+    const status = machineVoteStatus(existingVote?.voteType ?? null, body.voteType);
+    if (status === "updated") {
+      await db
+        .update(machineVotes)
+        .set({ voteType: body.voteType })
+        .where(and(eq(machineVotes.machineId, id), eq(machineVotes.voterFingerprint, body.voterFingerprint)));
+    }
+
+    return c.json({ ok: true, status }, 200);
   });
 
 function groupSnapshotsByVideoId(rows: (typeof videoSnapshots.$inferSelect)[]) {
