@@ -1,7 +1,35 @@
 import { describe, expect, test } from "bun:test";
-import { buildVideoMetadataBackfillUpdates } from "./video-metadata-backfill";
+import {
+  buildVideoMetadataBackfillUpdates,
+  filterUpdatesAfterMetadataFetch,
+  selectVideoMetadataRows,
+} from "./video-metadata-backfill";
 
 describe("video metadata backfill planning", () => {
+  const rows = [
+    { videoId: "complete-1", title: "complete", durationSeconds: 120, liveBroadcastContent: "none" },
+    { videoId: "missing-duration", title: "missing duration", durationSeconds: null, liveBroadcastContent: "none" },
+    { videoId: "missing-live-status", title: "missing status", durationSeconds: 120, liveBroadcastContent: null },
+  ] as const;
+
+  test("selects only incomplete rows during normal reclassification", () => {
+    expect(selectVideoMetadataRows(rows, false).map((row) => row.videoId)).toEqual(["missing-duration", "missing-live-status"]);
+  });
+
+  test("selects every row when refresh metadata is enabled", () => {
+    expect(selectVideoMetadataRows(rows, true).map((row) => row.videoId)).toEqual(["complete-1", "missing-duration", "missing-live-status"]);
+  });
+
+  test("does not retain updates for videos whose refresh fetch failed", () => {
+    const updates = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "complete-1", title: "complete", durationSeconds: 120, liveBroadcastContent: "none" }],
+      [],
+    ).updates;
+
+    expect(filterUpdatesAfterMetadataFetch(updates, [], true)).toEqual([]);
+    expect(filterUpdatesAfterMetadataFetch(updates, [], false)).toHaveLength(1);
+  });
+
   test("classifies fetched shorts metadata", () => {
     const result = buildVideoMetadataBackfillUpdates(
       [{ videoId: "short-1", title: "short practice", durationSeconds: null, liveBroadcastContent: null }],
@@ -30,6 +58,15 @@ describe("video metadata backfill planning", () => {
 
     expect(result.failedVideoIds).toEqual([]);
     expect(result.updates[0]?.classification.contentType).toBe("standard");
+  });
+
+  test("uses refreshed live metadata when stored fields are already populated", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "archive-1", title: "\u914d\u4fe1\u30a2\u30fc\u30ab\u30a4\u30d6", durationSeconds: 1800, liveBroadcastContent: "none" }],
+      [{ videoId: "archive-1", durationSeconds: 1800, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }],
+    );
+
+    expect(result.updates[0]?.classification.contentType).toBe("live");
   });
 
   test("does not classify missing metadata rows after an API failure", () => {

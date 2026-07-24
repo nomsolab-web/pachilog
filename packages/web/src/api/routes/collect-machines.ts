@@ -95,6 +95,7 @@ export const collectMachines = new Hono().post("/run", async (c) => {
           title: video.title,
           durationSeconds: stat.durationSeconds,
           liveBroadcastContent: stat.liveBroadcastContent,
+          liveStreamingDetails: stat.liveStreamingDetails,
           channelCategory: ch.category,
         });
         if (existingVideo) {
@@ -106,6 +107,8 @@ export const collectMachines = new Hono().post("/run", async (c) => {
             existingVideo.likeCount !== stat.likeCount ||
             existingVideo.commentCount !== stat.commentCount ||
             existingVideo.contentType !== classification.contentType ||
+            existingVideo.contentTypeReason !== classification.reason ||
+            existingVideo.contentTypeConfidence !== classification.confidence ||
             existingVideo.durationSeconds !== stat.durationSeconds ||
             existingVideo.liveBroadcastContent !== stat.liveBroadcastContent;
 
