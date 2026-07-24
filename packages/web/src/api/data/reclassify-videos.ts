@@ -4,7 +4,8 @@ import { channels, videos } from "../database/schema";
 import { VIDEO_CONTENT_TYPES, type VideoContentType } from "../lib/content-type";
 import {
   buildVideoMetadataBackfillUpdates,
-  needsYoutubeMetadataBackfill,
+  filterUpdatesAfterMetadataFetch,
+  selectVideoMetadataRows,
   type BackfillVideoMetadata,
 } from "../lib/video-metadata-backfill";
 import { chunkArray, fetchVideoStats } from "../lib/youtube";
@@ -20,41 +21,6 @@ async function main() {
 
   const [videoRows, channelRows] = await Promise.all([db.select().from(videos), db.select().from(channels)]);
   const channelsById = new Map(channelRows.map((channel) => [channel.id, channel]));
-  const metadataRows = videoRows
-    .map((video) => ({
-      videoId: video.videoId,
-      title: video.title,
-      durationSeconds: video.durationSeconds,
-      liveBroadcastContent: video.liveBroadcastContent,
-      channelCategory: channelsById.get(video.channelId)?.category,
-    }))
-    .filter((video) => refreshMetadata || needsYoutubeMetadataBackfill(video));
-  const fetchedMetadata: BackfillVideoMetadata[] = [];
-  const failedVideoIds = new Set<string>();
-
-  if (refreshMetadata) {
-    for (const batch of chunkArray(metadataRows, 50)) {
-      try {
-        const stats = await fetchVideoStats(batch.map((video) => video.videoId));
-        fetchedMetadata.push(
-          ...stats.map((stat) => ({
-            videoId: stat.videoId,
-            durationSeconds: stat.durationSeconds,
-            liveBroadcastContent: stat.liveBroadcastContent,
-            liveStreamingDetails: stat.liveStreamingDetails,
-          })),
-        );
-        const fetchedIds = new Set(stats.map((stat) => stat.videoId));
-        for (const video of batch) {
-          if (!fetchedIds.has(video.videoId)) failedVideoIds.add(video.videoId);
-        }
-      } catch (err) {
-        for (const video of batch) failedVideoIds.add(video.videoId);
-        console.error(`Failed to fetch YouTube metadata for batch ${batch[0]?.videoId}: ${(err as Error).message}`);
-      }
-    }
-  }
-
   const inputRows = videoRows.map((video) => ({
     videoId: video.videoId,
     title: video.title,
@@ -62,8 +28,34 @@ async function main() {
     liveBroadcastContent: video.liveBroadcastContent,
     channelCategory: channelsById.get(video.channelId)?.category,
   }));
-  const { updates, failedVideoIds: missingMetadataIds } = buildVideoMetadataBackfillUpdates(inputRows, fetchedMetadata);
+  const metadataRows = selectVideoMetadataRows(inputRows, refreshMetadata);
+  const fetchedMetadata: BackfillVideoMetadata[] = [];
+  const failedVideoIds = new Set<string>();
+
+  for (const batch of chunkArray(metadataRows, 50)) {
+    try {
+      const stats = await fetchVideoStats(batch.map((video) => video.videoId));
+      fetchedMetadata.push(
+        ...stats.map((stat) => ({
+          videoId: stat.videoId,
+          durationSeconds: stat.durationSeconds,
+          liveBroadcastContent: stat.liveBroadcastContent,
+          liveStreamingDetails: stat.liveStreamingDetails,
+        })),
+      );
+      const fetchedIds = new Set(stats.map((stat) => stat.videoId));
+      for (const video of batch) {
+        if (!fetchedIds.has(video.videoId)) failedVideoIds.add(video.videoId);
+      }
+    } catch (err) {
+      for (const video of batch) failedVideoIds.add(video.videoId);
+      console.error(`Failed to fetch YouTube metadata for batch ${batch[0]?.videoId}: ${(err as Error).message}`);
+    }
+  }
+
+  const { updates: plannedUpdates, failedVideoIds: missingMetadataIds } = buildVideoMetadataBackfillUpdates(inputRows, fetchedMetadata);
   for (const videoId of missingMetadataIds) failedVideoIds.add(videoId);
+  const updates = filterUpdatesAfterMetadataFetch(plannedUpdates, fetchedMetadata, refreshMetadata);
 
   const currentByVideoId = new Map(videoRows.map((video) => [video.videoId, video]));
   const beforeCounts = countTypes(videoRows.map((video) => video.contentType));
@@ -83,6 +75,14 @@ async function main() {
         reason: update.classification.reason,
       });
     }
+  }
+
+  const transitionCounts: Record<string, number> = {};
+  const transitionExamples: Record<string, typeof changes> = {};
+  for (const change of changes) {
+    const transition = `${change.before}${change.after}`;
+    transitionCounts[transition] = (transitionCounts[transition] ?? 0) + 1;
+    (transitionExamples[transition] ??= []).push(change);
   }
 
   if (apply) {
@@ -122,6 +122,10 @@ async function main() {
     afterCounts: countTypes([...afterTypes.values()]),
     changes: {
       total: changes.length,
+      byTransition: transitionCounts,
+      examplesByTransition: Object.fromEntries(
+        Object.entries(transitionExamples).map(([transition, examples]) => [transition, examples.slice(0, 20)]),
+      ),
       examples: changes.slice(0, 20),
     },
     updated: apply ? updates.length : 0,

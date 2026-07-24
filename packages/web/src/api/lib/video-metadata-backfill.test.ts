@@ -1,7 +1,35 @@
 import { describe, expect, test } from "bun:test";
-import { buildVideoMetadataBackfillUpdates } from "./video-metadata-backfill";
+import {
+  buildVideoMetadataBackfillUpdates,
+  filterUpdatesAfterMetadataFetch,
+  selectVideoMetadataRows,
+} from "./video-metadata-backfill";
 
 describe("video metadata backfill planning", () => {
+  const rows = [
+    { videoId: "complete-1", title: "complete", durationSeconds: 120, liveBroadcastContent: "none" },
+    { videoId: "missing-duration", title: "missing duration", durationSeconds: null, liveBroadcastContent: "none" },
+    { videoId: "missing-live-status", title: "missing status", durationSeconds: 120, liveBroadcastContent: null },
+  ] as const;
+
+  test("selects only incomplete rows during normal reclassification", () => {
+    expect(selectVideoMetadataRows(rows, false).map((row) => row.videoId)).toEqual(["missing-duration", "missing-live-status"]);
+  });
+
+  test("selects every row when refresh metadata is enabled", () => {
+    expect(selectVideoMetadataRows(rows, true).map((row) => row.videoId)).toEqual(["complete-1", "missing-duration", "missing-live-status"]);
+  });
+
+  test("does not retain updates for videos whose refresh fetch failed", () => {
+    const updates = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "complete-1", title: "complete", durationSeconds: 120, liveBroadcastContent: "none" }],
+      [],
+    ).updates;
+
+    expect(filterUpdatesAfterMetadataFetch(updates, [], true)).toEqual([]);
+    expect(filterUpdatesAfterMetadataFetch(updates, [], false)).toHaveLength(1);
+  });
+
   test("classifies fetched shorts metadata", () => {
     const result = buildVideoMetadataBackfillUpdates(
       [{ videoId: "short-1", title: "short practice", durationSeconds: null, liveBroadcastContent: null }],

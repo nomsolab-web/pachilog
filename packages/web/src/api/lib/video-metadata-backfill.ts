@@ -22,6 +22,20 @@ export type VideoMetadataBackfillUpdate = {
   classification: VideoContentClassification;
 };
 
+export function filterUpdatesAfterMetadataFetch(
+  updates: readonly VideoMetadataBackfillUpdate[],
+  fetchedMetadata: readonly BackfillVideoMetadata[],
+  requireFetchedMetadata: boolean,
+) {
+  if (!requireFetchedMetadata) return updates;
+  const fetchedIds = new Set(fetchedMetadata.map((metadata) => metadata.videoId));
+  return updates.filter((update) => fetchedIds.has(update.videoId));
+}
+
+export function selectVideoMetadataRows(videos: readonly BackfillVideoRow[], refreshMetadata: boolean) {
+  return videos.filter((video) => refreshMetadata || needsYoutubeMetadataBackfill(video));
+}
+
 export function needsYoutubeMetadataBackfill(video: BackfillVideoRow) {
   return video.durationSeconds === null || video.liveBroadcastContent === null;
 }
