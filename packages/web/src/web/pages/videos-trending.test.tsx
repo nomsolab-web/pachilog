@@ -35,7 +35,7 @@ describe("videos trending content type UI", () => {
 
   test("renders loading, empty and error states separately", () => {
     expect(renderToStaticMarkup(<LoadingGrid />)).toContain("animate-pulse");
-    expect(renderToStaticMarkup(<EmptyState />)).toContain("対象の動画がありません");
+    expect(renderToStaticMarkup(<EmptyState />)).toContain("この種別の動画はまだありません");
     expect(renderToStaticMarkup(<ErrorState onRetry={() => undefined} />)).toContain("動画データを取得できませんでした");
   });
 

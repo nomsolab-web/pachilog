@@ -137,6 +137,11 @@ export type VideoStats = {
   commentCount: number;
   durationSeconds: number | null;
   liveBroadcastContent: string | null;
+  liveStreamingDetails: {
+    actualStartTime?: string | null;
+    actualEndTime?: string | null;
+    scheduledStartTime?: string | null;
+  } | null;
 };
 
 export async function fetchUploadsPlaylistId(channelId: string): Promise<string | null> {
@@ -161,7 +166,7 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
   const results: VideoStats[] = [];
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
-    const url = `${YT_API_BASE}/videos?part=statistics,contentDetails,snippet&id=${batch.join(",")}&key=${apiKey()}`;
+    const url = `${YT_API_BASE}/videos?part=statistics,contentDetails,snippet,liveStreamingDetails&id=${batch.join(",")}&key=${apiKey()}`;
     const data = await withYoutubeRetry(() => youtubeJson(url, "video statistics lookup"));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const item of data.items ?? []) {
@@ -172,6 +177,13 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
         commentCount: Number(item.statistics?.commentCount ?? 0),
         durationSeconds: parseYoutubeDuration(item.contentDetails?.duration),
         liveBroadcastContent: item.snippet?.liveBroadcastContent ?? null,
+        liveStreamingDetails: item.liveStreamingDetails
+          ? {
+              actualStartTime: item.liveStreamingDetails.actualStartTime ?? null,
+              actualEndTime: item.liveStreamingDetails.actualEndTime ?? null,
+              scheduledStartTime: item.liveStreamingDetails.scheduledStartTime ?? null,
+            }
+          : null,
       });
     }
   }

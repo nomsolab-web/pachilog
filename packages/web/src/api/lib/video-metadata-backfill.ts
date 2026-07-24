@@ -12,6 +12,7 @@ export type BackfillVideoMetadata = {
   videoId: string;
   durationSeconds: number | null;
   liveBroadcastContent: string | null;
+  liveStreamingDetails?: Parameters<typeof classifyVideoContent>[0]["liveStreamingDetails"];
 };
 
 export type VideoMetadataBackfillUpdate = {
@@ -34,7 +35,8 @@ export function buildVideoMetadataBackfillUpdates(
   const failedVideoIds: string[] = [];
 
   for (const video of videos) {
-    if (!needsYoutubeMetadataBackfill(video)) {
+    const metadata = metadataByVideoId.get(video.videoId);
+    if (!needsYoutubeMetadataBackfill(video) && !metadata) {
       const classification = classifyVideoContent({
         title: video.title,
         durationSeconds: video.durationSeconds,
@@ -50,7 +52,6 @@ export function buildVideoMetadataBackfillUpdates(
       continue;
     }
 
-    const metadata = metadataByVideoId.get(video.videoId);
     if (!metadata) {
       failedVideoIds.push(video.videoId);
       continue;
@@ -60,6 +61,7 @@ export function buildVideoMetadataBackfillUpdates(
       title: video.title,
       durationSeconds: metadata.durationSeconds,
       liveBroadcastContent: metadata.liveBroadcastContent,
+      liveStreamingDetails: metadata.liveStreamingDetails,
       channelCategory: video.channelCategory,
     });
     updates.push({

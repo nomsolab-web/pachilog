@@ -32,6 +32,15 @@ describe("video metadata backfill planning", () => {
     expect(result.updates[0]?.classification.contentType).toBe("standard");
   });
 
+  test("uses refreshed live metadata when stored fields are already populated", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "archive-1", title: "\u914d\u4fe1\u30a2\u30fc\u30ab\u30a4\u30d6", durationSeconds: 1800, liveBroadcastContent: "none" }],
+      [{ videoId: "archive-1", durationSeconds: 1800, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }],
+    );
+
+    expect(result.updates[0]?.classification.contentType).toBe("live");
+  });
+
   test("does not classify missing metadata rows after an API failure", () => {
     const result = buildVideoMetadataBackfillUpdates(
       [{ videoId: "failed-1", title: "might be shorts", durationSeconds: null, liveBroadcastContent: null }],
