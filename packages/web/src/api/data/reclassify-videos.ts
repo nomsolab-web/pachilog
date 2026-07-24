@@ -106,7 +106,7 @@ async function main() {
     mode: apply ? "apply" : "dry-run",
     videosScanned: videoRows.length,
     metadataBackfill: {
-      enabled: refreshMetadata,
+      mode: refreshMetadata ? "refresh-all" : "incomplete-only",
       requested: metadataRows.length,
       fetched: fetchedMetadata.length,
       failed: failedVideoIds.size,
@@ -133,7 +133,9 @@ async function main() {
 
   console.log(JSON.stringify(summary, null, 2));
   if (!apply) {
-    console.log("Dry-run only. Re-run with --apply to update rows. Add --refresh-metadata to call YouTube videos.list.");
+    console.log(
+      "Dry-run only. Incomplete metadata is fetched by default; add --refresh-metadata to fetch all videos. Re-run with --apply to update rows.",
+    );
   }
 }
 
