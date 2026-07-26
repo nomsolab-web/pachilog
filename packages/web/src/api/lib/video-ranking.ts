@@ -1,8 +1,34 @@
+import { selectComparisonSnapshots } from "./ranking";
+
 export type VideoRankingEntry = {
   videoId: string;
   currentViewCount: number;
   viewDelta: number;
 };
+
+export type VideoSnapshotForRanking = { date: string; viewCount: number };
+
+export function calculateVideoTrend(snapshots: readonly VideoSnapshotForRanking[], period: number) {
+  const comparison = selectComparisonSnapshots(
+    snapshots.map((snapshot) => ({ ...snapshot, subscriberCount: snapshot.viewCount })),
+    period,
+  );
+  const hasTrend = !!comparison.latest && !!comparison.base && comparison.status === "ready";
+  const viewDelta = hasTrend ? comparison.latest!.viewCount - comparison.base!.viewCount : 0;
+  const viewDeltaPct = hasTrend && comparison.base!.viewCount > 0 ? (viewDelta / comparison.base!.viewCount) * 100 : 0;
+  return {
+    latestDate: comparison.latest?.date ?? null,
+    baseDate: hasTrend ? comparison.base?.date ?? null : null,
+    snapshotDays: snapshots.length,
+    comparisonStatus: comparison.status,
+    comparisonStartDate: comparison.comparisonStartDate,
+    comparisonEndDate: comparison.comparisonEndDate,
+    isProvisional: false,
+    hasTrend,
+    viewDelta,
+    viewDeltaPct: Number(viewDeltaPct.toFixed(2)),
+  };
+}
 
 export type VideoRankingCursor = {
   viewDelta: number;
@@ -55,7 +81,7 @@ export function paginateVideoRanking<T extends VideoRankingEntry>(
   const startIndex = cursor ? rankedEntries.findIndex((entry) => compareEntryToCursor(entry, cursor) > 0) : 0;
   const safeStartIndex = startIndex >= 0 ? startIndex : rankedEntries.length;
   const page = rankedEntries.slice(safeStartIndex, safeStartIndex + limit);
-  const last = page.at(-1);
+  const last = page[page.length - 1];
   return {
     page,
     nextCursor:

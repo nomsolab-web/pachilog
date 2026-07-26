@@ -74,8 +74,8 @@ export function videoTrendingQueryParams(
   };
 }
 
-export function machineDetailQueryParams(contentType: VideoContentTypeValue) {
-  return { contentType };
+export function machineDetailQueryParams(contentType: VideoContentTypeValue, sort: "rising" | "newest" | "views" = "rising") {
+  return { contentType, sort };
 }
 
 export function videoTrendMetricLabel(video: {

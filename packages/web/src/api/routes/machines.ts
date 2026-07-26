@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
-import { isVideoContentType, type VideoContentType } from "../lib/content-type";
+import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { countMachineContentTypes } from "../lib/machine-content";
 import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
-import { selectComparisonSnapshots } from "../lib/ranking";
+import { calculateVideoTrend, sortVideoRankingEntries } from "../lib/video-ranking";
 
 export const machinesRoute = new Hono()
   .get("/", async (c) => {
@@ -20,7 +20,7 @@ export const machinesRoute = new Hono()
       })
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
-      .where(and(ne(videoMachineLinks.matchMethod, "manual_excluded"), eq(videos.contentType, "standard")));
+      .where(and(eq(videos.matchStatus, "matched"), eq(videos.contentType, "standard")));
     const videoIds = [...new Set(rows.map((row) => row.videoId))];
     const snapshots =
       videoIds.length > 0
@@ -33,15 +33,9 @@ export const machinesRoute = new Hono()
       const stats = statsByMachine.get(row.machineId) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0 };
       stats.totalViews += row.viewCount;
       stats.videoCount += 1;
-      const comparison = selectComparisonSnapshots(
-        (snapshotsByVideoId.get(row.videoId) ?? []).map((snapshot) => ({
-          date: snapshot.date,
-          subscriberCount: snapshot.viewCount,
-        })),
-        7,
-      );
-      if (comparison.latest && comparison.base) {
-        stats.recentViews += Math.max(0, comparison.latest.subscriberCount - comparison.base.subscriberCount);
+      const trend = calculateVideoTrend(snapshotsByVideoId.get(row.videoId) ?? [], 7);
+      if (trend.hasTrend) {
+        stats.recentViews += Math.max(0, trend.viewDelta);
         stats.recentVideoCount += 1;
       }
       statsByMachine.set(row.machineId, stats);
@@ -56,6 +50,7 @@ export const machinesRoute = new Hono()
   .get("/:id", async (c) => {
     const id = Number(c.req.param("id"));
     const contentTypes = parseContentTypes(c.req.query("contentType") ?? "standard");
+    const sort = parseSort(c.req.query("sort"));
     const [machine] = await db.select().from(machines).where(eq(machines.id, id));
     if (!machine) return c.json({ error: "not found" }, 404);
 
@@ -71,6 +66,7 @@ export const machinesRoute = new Hono()
         updatedAt: videos.updatedAt,
         contentType: videos.contentType,
         matchMethod: videoMachineLinks.matchMethod,
+        matchStatus: videos.matchStatus,
         channelId: channels.id,
         channelName: channels.name,
         channelThumbnailUrl: channels.thumbnailUrl,
@@ -78,24 +74,63 @@ export const machinesRoute = new Hono()
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
       .innerJoin(channels, eq(videos.channelId, channels.id))
-      .where(and(eq(videoMachineLinks.machineId, id), ne(videoMachineLinks.matchMethod, "manual_excluded")))
-      .orderBy(desc(videos.viewCount));
+      .where(and(eq(videoMachineLinks.machineId, id), eq(videos.matchStatus, "matched")))
+      .orderBy(desc(videos.updatedAt));
 
     const mentions = linkedVideos.filter((video) => contentTypes.includes(video.contentType));
     const uniqueMentions = [...new Map(mentions.map((mention) => [mention.videoId, mention])).values()];
-    const publishedDates = uniqueMentions.map((mention) => mention.publishedAt).filter((value): value is string => !!value).sort();
+    const allConfirmedVideos = [...new Map(linkedVideos.map((mention) => [mention.videoId, mention])).values()];
+    const videoIds = allConfirmedVideos.map((video) => video.videoId);
+    const snapshots = videoIds.length > 0
+      ? await db.select().from(videoSnapshots).where(inArray(videoSnapshots.videoId, videoIds)).orderBy(desc(videoSnapshots.date))
+      : [];
+    const snapshotsByVideoId = groupSnapshotsByVideoId(snapshots);
+    const machineTags = videoIds.length > 0
+      ? await db
+          .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name })
+          .from(videoMachineLinks)
+          .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id))
+          .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
+          .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, "matched")))
+      : [];
+    const machineTagsByVideoId = new Map<string, { id: number; name: string }[]>();
+    for (const tag of machineTags) {
+      const tags = machineTagsByVideoId.get(tag.videoId) ?? [];
+      if (!tags.some((item) => item.id === tag.machineId)) tags.push({ id: tag.machineId, name: tag.machineName });
+      machineTagsByVideoId.set(tag.videoId, tags);
+    }
+    const rankedMentions = uniqueMentions.map((video) => ({
+      ...video,
+      machineTags: machineTagsByVideoId.get(video.videoId) ?? [],
+      ...calculateVideoTrend(snapshotsByVideoId.get(video.videoId) ?? [], 7),
+      currentViewCount: video.viewCount,
+    }));
+    const videosForDisplay = sortMachineVideos(rankedMentions, sort);
+    const publishedDates = allConfirmedVideos.map((mention) => mention.publishedAt).filter((value): value is string => !!value).sort();
+    const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentVideos = allConfirmedVideos.filter((video) => video.publishedAt && Date.parse(video.publishedAt) >= recentCutoff);
+    const recentViews = allConfirmedVideos.reduce((sum, video) => {
+      const trend = calculateVideoTrend(snapshotsByVideoId.get(video.videoId) ?? [], 7);
+      return sum + (trend.hasTrend ? Math.max(0, trend.viewDelta) : 0);
+    }, 0);
+    const updatedDates = allConfirmedVideos.map((video) => video.updatedAt).filter(Boolean).sort((a, b) => b.getTime() - a.getTime());
+    const lastUpdatedAt = updatedDates[0] ?? null;
 
     return c.json(
       {
         machine,
-        mentions: uniqueMentions,
+        mentions: videosForDisplay,
         contentTypes,
-        contentTypeCounts: countMachineContentTypes(linkedVideos),
+        contentTypeCounts: countMachineContentTypes(allConfirmedVideos),
         summary: {
-          videoCount: uniqueMentions.length,
-          totalViews: uniqueMentions.reduce((sum, mention) => sum + mention.viewCount, 0),
+          videoCount: allConfirmedVideos.length,
+          rankingVideoCount: allConfirmedVideos.filter((video) => ["standard", "short", "live"].includes(video.contentType)).length,
+          totalViews: allConfirmedVideos.reduce((sum, mention) => sum + mention.viewCount, 0),
+          recentVideoCount: recentVideos.length,
+          recentViews,
+          lastUpdatedAt,
           periodStart: publishedDates[0] ?? null,
-          periodEnd: publishedDates.at(-1) ?? null,
+          periodEnd: publishedDates[publishedDates.length - 1] ?? null,
         },
       },
       200,
@@ -167,4 +202,28 @@ function parseContentTypes(value: string): VideoContentType[] {
     .map((item) => item.trim())
     .filter(isVideoContentType);
   return parsed.length > 0 ? parsed : ["standard"];
+}
+
+type MachineSort = "rising" | "newest" | "views";
+
+function parseSort(value: string | undefined): MachineSort {
+  return value === "newest" || value === "views" ? value : "rising";
+}
+
+function sortMachineVideos<T extends {
+  videoId: string;
+  currentViewCount: number;
+  viewDelta: number;
+  contentType: VideoContentType;
+  publishedAt: string | null;
+}>(videos: readonly T[], sort: MachineSort) {
+  if (sort === "rising") return sortVideoRankingEntries(videos.filter((video) => video.viewDelta > 0 && isRankableVideoContentType(video.contentType)));
+  return [...videos].sort((a, b) => {
+    if (sort === "views") return b.currentViewCount - a.currentViewCount || compareDates(b.publishedAt, a.publishedAt);
+    return compareDates(b.publishedAt, a.publishedAt) || b.currentViewCount - a.currentViewCount;
+  });
+}
+
+function compareDates(a: string | null, b: string | null) {
+  return Date.parse(a ?? "") - Date.parse(b ?? "");
 }

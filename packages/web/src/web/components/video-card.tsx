@@ -1,4 +1,5 @@
 import { Eye, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { ChannelAvatar } from "./channel-avatar";
 import { type VideoContentTypeValue } from "../lib/video-content-types";
 
@@ -38,6 +39,7 @@ type Props = {
   channelThumbnailUrl?: string | null;
   metric?: string;
   contentType?: VideoContentTypeValue | null;
+  machineTags?: { id: number; name: string }[];
 };
 
 export function VideoCard({
@@ -50,6 +52,7 @@ export function VideoCard({
   channelThumbnailUrl,
   metric,
   contentType,
+  machineTags = [],
 }: Props) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const imageUrl = thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -98,6 +101,19 @@ export function VideoCard({
           </span>
           {metric && <span className="font-semibold text-info">{metric}</span>}
         </div>
+        {machineTags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Related machines">
+            {machineTags.map((machine) => (
+              <Link
+                key={machine.id}
+                to={`/machines/${machine.id}`}
+                className="max-w-full truncate rounded-md border border-info/30 bg-info/5 px-2 py-1 text-[11px] text-info hover:bg-info/10"
+              >
+                {machine.name}
+              </Link>
+            ))}
+          </div>
+        )}
         <a
           href={youtubeUrl}
           target="_blank"

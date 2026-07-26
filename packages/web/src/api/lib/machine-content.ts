@@ -4,10 +4,15 @@ export type MachineLinkedVideo = {
   videoId: string;
   matchMethod: string;
   contentType: VideoContentType;
+  matchStatus?: string | null;
 };
 
+export function isConfirmedMachineLink(row: Pick<MachineLinkedVideo, "matchMethod" | "matchStatus">) {
+  return row.matchStatus === "matched" && row.matchMethod !== "manual_excluded";
+}
+
 export function excludeManualExcludedLinks<T extends MachineLinkedVideo>(rows: readonly T[]) {
-  return rows.filter((row) => row.matchMethod !== "manual_excluded");
+  return rows.filter(isConfirmedMachineLink);
 }
 
 export function countMachineContentTypes(rows: readonly { contentType: VideoContentType }[]) {

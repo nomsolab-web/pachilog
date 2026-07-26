@@ -129,6 +129,7 @@ function Index() {
                 viewCount={video.currentViewCount}
                 channelName={video.channelName}
                 channelThumbnailUrl={video.channelThumbnailUrl}
+                machineTags={video.machineTags}
                 metric={video.hasTrend ? `+${video.viewDelta.toLocaleString("ja-JP")}回` : "データ蓄積中"}
               />
             ))}

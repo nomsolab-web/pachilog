@@ -52,7 +52,7 @@ describe("video content type tabs", () => {
       limit: "20",
       cursor: "cursor-1",
     });
-    expect(machineDetailQueryParams("unknown")).toEqual({ contentType: "unknown" });
+    expect(machineDetailQueryParams("unknown")).toEqual({ contentType: "unknown", sort: "rising" });
   });
 
   test("restores tabs from URL-compatible values", () => {
