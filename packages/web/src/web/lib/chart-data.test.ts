@@ -1,5 +1,74 @@
 import { describe, expect, test } from "bun:test";
-import { prepareChartData, type Snapshot } from "./chart-data";
+import { prepareChartData, calculateYAxisTicks, type Snapshot } from "./chart-data";
+
+describe("calculateYAxisTicks helper", () => {
+  test("0人から+10,000人の増加", () => {
+    // Expect step size = 2000, ticks = [0, 2000, 4000, 6000, 8000, 10000]
+    const { ticks, domain } = calculateYAxisTicks(0, 10000);
+    expect(ticks).toEqual([0, 2000, 4000, 6000, 8000, 10000]);
+    expect(domain[0]).toBeCloseTo(-300); // 0 - 300
+    expect(domain[1]).toBeCloseTo(10300); // 10000 + 300
+  });
+
+  test("-1,000人から+1,000人の増減", () => {
+    // Expect step size = 500, ticks = [-1000, -500, 0, 500, 1000]
+    const { ticks, domain } = calculateYAxisTicks(-1000, 1000);
+    expect(ticks).toEqual([-1000, -500, 0, 500, 1000]);
+    expect(domain[0]).toBeCloseTo(-1075);
+    expect(domain[1]).toBeCloseTo(1075);
+  });
+
+  test("変化なし (0, 0)", () => {
+    const { ticks, domain } = calculateYAxisTicks(0, 0);
+    expect(ticks).toEqual([0, 50, 100, 150, 200]);
+    expect(domain[0]).toBeCloseTo(-7.5);
+    expect(domain[1]).toBeCloseTo(207.5);
+  });
+
+  test("変化なし (30, 30)", () => {
+    const { ticks, domain } = calculateYAxisTicks(30, 30);
+    expect(ticks).toEqual([10, 20, 30, 40, 50]);
+    expect(domain[0]).toBeCloseTo(8.5);
+    expect(domain[1]).toBeCloseTo(51.5);
+  });
+
+  test("変化なし (5,000, 5,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(5000, 5000);
+    expect(ticks).toEqual([3000, 4000, 5000, 6000, 7000]);
+    expect(domain[0]).toBeCloseTo(2850);
+    expect(domain[1]).toBeCloseTo(7150);
+  });
+
+  test("変化なし (1,000,000, 1,000,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(1000000, 1000000);
+    expect(ticks).toEqual([600000, 800000, 1000000, 1200000, 1400000]);
+    expect(domain[0]).toBeCloseTo(570000);
+    expect(domain[1]).toBeCloseTo(1430000);
+  });
+
+  test("変化なし (-1,000, -1,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(-1000, -1000);
+    expect(ticks).toEqual([-1400, -1200, -1000, -800, -600]);
+    expect(domain[0]).toBeCloseTo(-1430);
+    expect(domain[1]).toBeCloseTo(-570);
+  });
+
+  test("数十人程度の増加 (30人)", () => {
+    // Expect step size = 10, ticks = [0, 10, 20, 30]
+    const { ticks, domain } = calculateYAxisTicks(0, 30);
+    expect(ticks).toEqual([0, 10, 20, 30]);
+    expect(domain[0]).toBeCloseTo(-1.5);
+    expect(domain[1]).toBeCloseTo(31.5);
+  });
+
+  test("数万人規模の増加 (50,000人)", () => {
+    // Expect step size = 10000, ticks = [0, 10000, 20000, 30000, 40000, 50000]
+    const { ticks, domain } = calculateYAxisTicks(0, 50000);
+    expect(ticks).toEqual([0, 10000, 20000, 30000, 40000, 50000]);
+    expect(domain[0]).toBeCloseTo(-1500);
+    expect(domain[1]).toBeCloseTo(51500);
+  });
+});
 
 describe("prepareChartData helper", () => {
   test("増加: calculates positive growth from period start", () => {
@@ -12,7 +81,6 @@ describe("prepareChartData helper", () => {
     const result = prepareChartData(snapshots, "subscriberCount");
 
     expect(result.data).toHaveLength(3);
-    // Values mapped: s.subscriberCount - periodStartSubscriberCount (100000)
     expect(result.data[0]).toEqual({ date: "07-01", value: 0, rawVal: 100000, dayDiff: 0 });
     expect(result.data[1]).toEqual({ date: "07-02", value: 100, rawVal: 100100, dayDiff: 100 });
     expect(result.data[2]).toEqual({ date: "07-03", value: 300, rawVal: 100300, dayDiff: 200 });
@@ -21,10 +89,12 @@ describe("prepareChartData helper", () => {
     expect(result.periodStartSubscriberCount).toBe(100000);
     expect(result.isPublic).toBe(true);
     expect(result.delta).toBe(300);
-    expect(result.deltaPct).toBeCloseTo(0.3); // 300 / 100000 * 100 = 0.3%
+    expect(result.deltaPct).toBeCloseTo(0.3);
 
-    // Domain range: min 0, max 300, range 300. Padding: 300 * 0.15 = 45. [0-45, 300+45] = [-45, 345]
-    expect(result.yDomain).toEqual([-45, 345]);
+    // min 0, max 300 -> step size = 100. ticks = [0, 100, 200, 300]
+    expect(result.ticks).toEqual([0, 100, 200, 300]);
+    expect(result.yDomain[0]).toBeCloseTo(-15);
+    expect(result.yDomain[1]).toBeCloseTo(315);
   });
 
   test("減少: calculates negative growth from period start", () => {
@@ -45,10 +115,10 @@ describe("prepareChartData helper", () => {
     expect(result.periodStartSubscriberCount).toBe(50000);
     expect(result.isPublic).toBe(true);
     expect(result.delta).toBe(-200);
-    expect(result.deltaPct).toBeCloseTo(-0.4); // -200 / 50000 * 100 = -0.4%
+    expect(result.deltaPct).toBeCloseTo(-0.4);
 
-    // Domain range: min -200, max 0, range 200. Padding: 200 * 0.15 = 30. [-200-30, 0+30] = [-230, 30]
-    expect(result.yDomain).toEqual([-230, 30]);
+    // min -200, max 0 -> range 200, step 50. ticks = [-200, -150, -100, -50, 0]
+    expect(result.ticks).toEqual([-200, -150, -100, -50, 0]);
   });
 
   test("変化なし: handles zero change during the period smoothly", () => {
@@ -67,9 +137,7 @@ describe("prepareChartData helper", () => {
 
     expect(result.delta).toBe(0);
     expect(result.deltaPct).toBe(0);
-
-    // Range is 0, so domain should fallback to [value - 100, value + 100] = [-100, 100]
-    expect(result.yDomain).toEqual([-100, 100]);
+    expect(result.ticks).toEqual([0, 50, 100, 150, 200]);
   });
 
   test("1日分のみ: handles single data point safely", () => {
@@ -83,7 +151,7 @@ describe("prepareChartData helper", () => {
     expect(result.data[0].value).toBe(0);
     expect(result.delta).toBe(0);
     expect(result.deltaPct).toBe(0);
-    expect(result.yDomain).toEqual([-100, 100]);
+    expect(result.ticks).toEqual([0, 50, 100, 150, 200]);
   });
 
   test("欠損日あり: sorts snapshots chronologically and maps correctly", () => {
@@ -130,7 +198,6 @@ describe("prepareChartData helper", () => {
 
     const result = prepareChartData(snapshots, "subscriberCount");
 
-    // The duplicate 2026-07-01 should be deduplicated, keeping the latest one (10050)
     expect(result.data).toHaveLength(2);
     expect(result.data[0].date).toBe("07-01");
     expect(result.data[0].rawVal).toBe(10050);
@@ -142,7 +209,6 @@ describe("prepareChartData helper", () => {
   });
 
   test("期間表示日数: calculates periodDays based on calendar days", () => {
-    // 2026-07-01 to 2026-07-07 represents 7 days
     const snapshots1: Snapshot[] = [
       { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
       { date: "2026-07-07", subscriberCount: 10050, viewCount: 120 },
@@ -150,7 +216,6 @@ describe("prepareChartData helper", () => {
     const result1 = prepareChartData(snapshots1, "subscriberCount");
     expect(result1.periodDays).toBe(7);
 
-    // With duplicate dates, it should still be 7 days
     const snapshots2: Snapshot[] = [
       { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
       { date: "2026-07-01", subscriberCount: 10010, viewCount: 105 },
@@ -159,7 +224,6 @@ describe("prepareChartData helper", () => {
     const result2 = prepareChartData(snapshots2, "subscriberCount");
     expect(result2.periodDays).toBe(7);
 
-    // With missing days, it calculates calendar-based difference (e.g. 01 to 05 is 5 days)
     const snapshots3: Snapshot[] = [
       { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
       { date: "2026-07-05", subscriberCount: 10050, viewCount: 120 },
