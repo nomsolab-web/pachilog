@@ -20,8 +20,12 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "\u914d\u4fe1\u4e88\u5b9a", liveBroadcastContent: "upcoming" }).contentType).toBe("live");
   });
 
-  test("classifies live archives from liveStreamingDetails", () => {
-    expect(classifyVideoContent({ title: "\u5b9f\u6cc1\u914d\u4fe1\u30a2\u30fc\u30ab\u30a4\u30d6", liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }).contentType).toBe("live");
+  test("does not infer a completed live archive from liveStreamingDetails alone", () => {
+    expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 3600, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }).contentType).toBe("standard");
+  });
+
+  test("does not downgrade an existing live row when archive metadata is inconclusive", () => {
+    expect(classifyVideoContent({ title: "こあげホール実践実機配信", durationSeconds: 3600, liveBroadcastContent: "none", existingContentType: "live" }).contentType).toBe("live");
   });
 
   test("does not classify live-related clips as live", () => {

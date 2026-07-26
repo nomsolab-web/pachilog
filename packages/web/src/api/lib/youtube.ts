@@ -141,6 +141,7 @@ export type VideoStats = {
     actualStartTime?: string | null;
     actualEndTime?: string | null;
     scheduledStartTime?: string | null;
+    scheduledEndTime?: string | null;
   } | null;
 };
 
@@ -182,6 +183,7 @@ export async function fetchVideoStats(videoIds: string[]): Promise<VideoStats[]>
               actualStartTime: item.liveStreamingDetails.actualStartTime ?? null,
               actualEndTime: item.liveStreamingDetails.actualEndTime ?? null,
               scheduledStartTime: item.liveStreamingDetails.scheduledStartTime ?? null,
+              scheduledEndTime: item.liveStreamingDetails.scheduledEndTime ?? null,
             }
           : null,
       });

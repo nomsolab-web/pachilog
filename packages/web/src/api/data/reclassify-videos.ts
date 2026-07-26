@@ -26,6 +26,7 @@ async function main() {
     title: video.title,
     durationSeconds: video.durationSeconds,
     liveBroadcastContent: video.liveBroadcastContent,
+    contentType: video.contentType,
     channelCategory: channelsById.get(video.channelId)?.category,
   }));
   const metadataRows = selectVideoMetadataRows(inputRows, refreshMetadata);
@@ -58,6 +59,7 @@ async function main() {
   const updates = filterUpdatesAfterMetadataFetch(plannedUpdates, fetchedMetadata, refreshMetadata);
 
   const currentByVideoId = new Map(videoRows.map((video) => [video.videoId, video]));
+  const metadataByVideoId = new Map(fetchedMetadata.map((metadata) => [metadata.videoId, metadata]));
   const beforeCounts = countTypes(videoRows.map((video) => video.contentType));
   const afterTypes = new Map(videoRows.map((video) => [video.videoId, video.contentType]));
   const changes = [];
@@ -73,6 +75,16 @@ async function main() {
         before: current.contentType,
         after: update.classification.contentType,
         reason: update.classification.reason,
+        metadata: (() => {
+          const metadata = metadataByVideoId.get(update.videoId);
+          return metadata
+            ? {
+                durationSeconds: metadata.durationSeconds,
+                liveBroadcastContent: metadata.liveBroadcastContent,
+                liveStreamingDetails: metadata.liveStreamingDetails ?? null,
+              }
+            : null;
+        })(),
       });
     }
   }
@@ -102,6 +114,31 @@ async function main() {
   }
 
   const quotaUnits = Math.ceil(metadataRows.length / 50);
+  const diagnosticTerms = [
+    "歌ってみた",
+    "生配信の見どころまとめショート",
+    "パチンコ屋さんから生配信の見どころ",
+    "こあげホール",
+    "ハラキリドライブ",
+    "ハラキリDRIVE",
+    "【WebCM】L聖闘士星矢 黄金十二宮",
+    "【WebCM】eグランベルム",
+    "マルハン東日本カンパニーCM「週末スイッチ」篇",
+    "「東京喰種」導入1.5周年記念WEB CM",
+  ];
+  const requestedVideoChecks = videoRows
+    .filter((video) => diagnosticTerms.some((term) => video.title.includes(term)))
+    .map((video) => {
+      const metadata = metadataByVideoId.get(video.videoId);
+      return {
+        videoId: video.videoId,
+        title: video.title,
+        currentContentType: video.contentType,
+        durationSeconds: metadata?.durationSeconds ?? video.durationSeconds,
+        liveBroadcastContent: metadata?.liveBroadcastContent ?? video.liveBroadcastContent,
+        liveStreamingDetails: metadata?.liveStreamingDetails ?? null,
+      };
+    });
   const summary = {
     mode: apply ? "apply" : "dry-run",
     videosScanned: videoRows.length,
@@ -127,7 +164,9 @@ async function main() {
         Object.entries(transitionExamples).map(([transition, examples]) => [transition, examples.slice(0, 20)]),
       ),
       examples: changes.slice(0, 20),
+      liveChanges: changes.filter((change) => change.before === "live" || change.after === "live"),
     },
+    requestedVideoChecks,
     updated: apply ? updates.length : 0,
   };
 

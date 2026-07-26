@@ -39,3 +39,11 @@ jobs:
         run: |
           cd packages/web
           bun run data:reclassify-videos -- --refresh-metadata | tee "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dry-run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reclassify-videos-dry-run-report
+          path: ${{ github.step_summary }}
+          if-no-files-found: ignore
