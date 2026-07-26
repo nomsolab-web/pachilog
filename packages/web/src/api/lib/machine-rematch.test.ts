@@ -30,6 +30,28 @@ describe("machine rematch planning", () => {
     expect(decision.plannedMatchStatus).toBe("matched");
   });
 
+  test("deduplicates linksToAdd by machine and becomes empty on the second rematch", () => {
+    const video = { videoId: "v6", title: "Machine A Light popular machine Machine A", matchStatus: "unmatched" };
+    const overlapMachines = [{
+      id: 6,
+      name: "P Machine A",
+      uniqueAliases: ["Machine A Light"],
+      ambiguousAliases: ["popular machine"],
+      resolvingKeywords: ["Machine A"],
+    }];
+    const first = planMachineRematch([video], overlapMachines, [])[0];
+    expect(first.matches.map((match) => match.machineId)).toEqual([6]);
+    expect(first.linksToAdd.map((match) => match.machineId)).toEqual([6]);
+
+    const second = planMachineRematch([video], overlapMachines, first.linksToAdd.map((match) => ({
+      videoId: video.videoId,
+      machineId: match.machineId,
+      matchConfidence: match.matchConfidence,
+      matchMethod: match.matchMethod,
+    })))[0];
+    expect(second.linksToAdd).toEqual([]);
+  });
+
   test("does not confirm an ambiguous alias without its resolver", () => {
     const videos = [{ videoId: "v3", title: "人気機種を紹介", matchStatus: "unmatched" }];
     const decision = planMachineRematch(videos, machines, [])[0];

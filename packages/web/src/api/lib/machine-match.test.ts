@@ -96,4 +96,17 @@ describe("machine title matching", () => {
     ];
     expect(findDetailedMachineMatches("P Ocean 5 Special 実戦", machines).map((match) => match.machineId)).toEqual([14]);
   });
+
+  test("keeps one highest-confidence match when alias categories overlap", () => {
+    const machines = [{
+      id: 15,
+      name: "P Machine A",
+      uniqueAliases: ["Machine A Light"],
+      ambiguousAliases: ["popular machine"],
+      resolvingKeywords: ["Machine A"],
+    }];
+    const matches = findDetailedMachineMatches("Machine A Light popular machine Machine A 螳滓姶", machines);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ machineId: 15, matchMethod: "alias", matchConfidence: 85 });
+  });
 });

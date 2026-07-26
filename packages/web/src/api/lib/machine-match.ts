@@ -51,17 +51,20 @@ export function findDetailedMachineMatches(title: string, machines: readonly Mac
       (term): term is string => !!term
     );
 
+    let bestAliasMatch: MachineMatchResult | undefined;
     for (const term of aliasTerms) {
       if (!isSafeMachineTerm(term)) continue;
       const normTerm = normalizeText(term);
       if (normTerm && normalizedTitle.includes(normTerm)) {
-        candidates.push({
+        const candidate: MachineMatchResult = {
           machineId: machine.id,
           matchConfidence: 85,
           matchMethod: "alias",
           matchedTerm: term,
-        });
-        break; // Match one alias per machine is enough
+        };
+        if (!bestAliasMatch || candidate.matchedTerm.length > bestAliasMatch.matchedTerm.length) {
+          bestAliasMatch = candidate;
+        }
       }
     }
 
@@ -72,7 +75,9 @@ export function findDetailedMachineMatches(title: string, machines: readonly Mac
     const hasResolver = (machine.resolvingKeywords ?? []).some((term) =>
       normalizedTitle.includes(normalizeText(term))
     );
-    if (ambiguousTerm && hasResolver) {
+    if (bestAliasMatch) {
+      candidates.push(bestAliasMatch);
+    } else if (ambiguousTerm && hasResolver) {
       candidates.push({
         machineId: machine.id,
         matchConfidence: 75,

@@ -58,9 +58,11 @@ export function planMachineRematch(
         .map((link) => link.machineId),
     );
     const matches = findDetailedMachineMatches(video.title, machines);
-    const linksToAdd = matches.filter(
-      (match) => !protectedMachineIds.has(match.machineId) && !existingAutoMachineIds.has(match.machineId),
-    );
+    const linksToAdd = [...new Map(
+      matches
+        .filter((match) => !protectedMachineIds.has(match.machineId) && !existingAutoMachineIds.has(match.machineId))
+        .map((match) => [match.machineId, match] as const),
+    ).values()];
 
     const hasActiveLink = existing.some((link) => link.matchMethod !== "manual_excluded");
     const ambiguousMachineIds = findAmbiguousMachineCandidates(video.title, machines).map((machine) => machine.id);
