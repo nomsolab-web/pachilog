@@ -18,10 +18,39 @@ describe("calculateYAxisTicks helper", () => {
     expect(domain[1]).toBeCloseTo(1075);
   });
 
-  test("変化なし (0人)", () => {
+  test("変化なし (0, 0)", () => {
     const { ticks, domain } = calculateYAxisTicks(0, 0);
     expect(ticks).toEqual([0, 50, 100, 150, 200]);
-    expect(domain).toEqual([-30, 230]);
+    expect(domain[0]).toBeCloseTo(-7.5);
+    expect(domain[1]).toBeCloseTo(207.5);
+  });
+
+  test("変化なし (30, 30)", () => {
+    const { ticks, domain } = calculateYAxisTicks(30, 30);
+    expect(ticks).toEqual([10, 20, 30, 40, 50]);
+    expect(domain[0]).toBeCloseTo(8.5);
+    expect(domain[1]).toBeCloseTo(51.5);
+  });
+
+  test("変化なし (5,000, 5,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(5000, 5000);
+    expect(ticks).toEqual([3000, 4000, 5000, 6000, 7000]);
+    expect(domain[0]).toBeCloseTo(2850);
+    expect(domain[1]).toBeCloseTo(7150);
+  });
+
+  test("変化なし (1,000,000, 1,000,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(1000000, 1000000);
+    expect(ticks).toEqual([600000, 800000, 1000000, 1200000, 1400000]);
+    expect(domain[0]).toBeCloseTo(570000);
+    expect(domain[1]).toBeCloseTo(1430000);
+  });
+
+  test("変化なし (-1,000, -1,000)", () => {
+    const { ticks, domain } = calculateYAxisTicks(-1000, -1000);
+    expect(ticks).toEqual([-1400, -1200, -1000, -800, -600]);
+    expect(domain[0]).toBeCloseTo(-1430);
+    expect(domain[1]).toBeCloseTo(-570);
   });
 
   test("数十人程度の増加 (30人)", () => {

@@ -18,17 +18,45 @@ export function calculateYAxisTicks(
   // If no change, return a simple set of ticks around the value
   if (minVal === maxVal) {
     const val = minVal;
-    if (val >= 0) {
-      return {
-        ticks: [0, 50, 100, 150, 200],
-        domain: [-30, 230],
-      };
+    let step: number;
+    if (val === 0) {
+      step = 50;
     } else {
-      return {
-        ticks: [val - 100, val - 50, val, val + 50, val + 100],
-        domain: [val - 130, val + 130],
-      };
+      const absVal = Math.abs(val);
+      const rawStep = absVal / 4;
+      const stepMag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+      const norm = rawStep / stepMag;
+      if (norm < 1.5) {
+        step = 1 * stepMag;
+      } else if (norm < 3) {
+        step = 2 * stepMag;
+      } else if (norm < 7) {
+        step = 5 * stepMag;
+      } else {
+        step = 10 * stepMag;
+      }
     }
+    step = Math.max(1, step);
+
+    let ticks: number[];
+    if (val >= 0) {
+      const start = val - 2 * step;
+      if (start >= 0) {
+        ticks = [start, val - step, val, val + step, val + 2 * step];
+      } else {
+        ticks = [0, step, 2 * step, 3 * step, 4 * step];
+      }
+    } else {
+      ticks = [val - 2 * step, val - step, val, val + step, val + 2 * step];
+    }
+
+    const domainMin = ticks[0] - step * 0.15;
+    const domainMax = ticks[ticks.length - 1] + step * 0.15;
+
+    return {
+      ticks,
+      domain: [domainMin, domainMax],
+    };
   }
 
   // Calculate raw range
