@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createClient, type Client } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import * as schema from "../database/schema";
 import { Hono } from "hono";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,15 +9,12 @@ import { join } from "node:path";
 
 let app: Hono;
 let client: Client;
-let appDbClient: Client;
 let tempDir: string;
 
 describe("rankings API route", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "pachilog-rankings-"));
-    const databaseUrl = process.env.DATABASE_URL || `file:${join(tmpdir(), "pachilog-shared-test.db")}`;
-    process.env.DATABASE_URL = databaseUrl;
-    process.env.DATABASE_AUTH_TOKEN = "";
+    const databaseUrl = `file:${join(tempDir, "test.db")}`;
     client = createClient({ url: databaseUrl });
     await client.batch([
       `CREATE TABLE IF NOT EXISTS channels (
@@ -40,16 +39,24 @@ describe("rankings API route", () => {
         FOREIGN KEY(channel_id) REFERENCES channels(id) ON DELETE cascade
       )`
     ]);
-    const { rankings } = await import("./rankings");
-    app = new Hono().route("/rankings", rankings);
-    appDbClient = (await import("../database")).client;
+    const db = drizzle(client, { schema });
+    const { createRankingsRoute } = await import("./rankings");
+    app = new Hono().route("/rankings", createRankingsRoute(db));
   });
 
   afterAll(async () => {
-    // Keep clients open to avoid clashing
-    // appDbClient.close();
-    // client.close();
-    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    client.close();
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await rm(tempDir, { recursive: true, force: true });
+        break;
+      } catch (err) {
+        retries--;
+        if (retries === 0) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
   });
 
   test("returns latestDate as null when there are no snapshots", async () => {

@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createClient, type Client } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import * as schema from "../database/schema";
 import type { Hono } from "hono";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,16 +9,13 @@ import { join } from "node:path";
 
 let app: Hono;
 let client: Client;
-let appDbClient: Client;
 let tempDir: string;
 let ipCounter = 0;
 
 describe("machine votes API", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "pachilog-machine-votes-"));
-    const databaseUrl = process.env.DATABASE_URL || `file:${join(tmpdir(), "pachilog-shared-test.db")}`;
-    process.env.DATABASE_URL = databaseUrl;
-    process.env.DATABASE_AUTH_TOKEN = "";
+    const databaseUrl = `file:${join(tempDir, "test.db")}`;
     client = createClient({ url: databaseUrl });
     await client.batch([
       `CREATE TABLE IF NOT EXISTS machines (
@@ -50,15 +49,24 @@ describe("machine votes API", () => {
       `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (4, 'machine four', 0)`,
       `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (5, 'machine five', 0)`,
     ]);
-    app = (await import("../index")).default;
-    appDbClient = (await import("../database")).client;
+    const db = drizzle(client, { schema });
+    const { createApp } = await import("../index");
+    app = createApp(db);
   });
 
   afterAll(async () => {
-    // Keep clients open to avoid clashing with rankings.test.ts
-    // appDbClient.close();
-    // client.close();
-    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    client.close();
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await rm(tempDir, { recursive: true, force: true });
+        break;
+      } catch (err) {
+        retries--;
+        if (retries === 0) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
   });
 
   test("records a new vote", async () => {
