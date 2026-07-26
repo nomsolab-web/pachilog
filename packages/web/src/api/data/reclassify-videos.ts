@@ -32,6 +32,7 @@ async function main() {
   const metadataRows = selectVideoMetadataRows(inputRows, refreshMetadata);
   const fetchedMetadata: BackfillVideoMetadata[] = [];
   const failedVideoIds = new Set<string>();
+  const metadataFailureDetails: { videoId: string; reason: string }[] = [];
 
   for (const batch of chunkArray(metadataRows, 50)) {
     try {
@@ -46,11 +47,17 @@ async function main() {
       );
       const fetchedIds = new Set(stats.map((stat) => stat.videoId));
       for (const video of batch) {
-        if (!fetchedIds.has(video.videoId)) failedVideoIds.add(video.videoId);
+        if (!fetchedIds.has(video.videoId)) {
+          failedVideoIds.add(video.videoId);
+          metadataFailureDetails.push({ videoId: video.videoId, reason: "YouTube API returned no video item" });
+        }
       }
-    } catch (err) {
-      for (const video of batch) failedVideoIds.add(video.videoId);
-      console.error(`Failed to fetch YouTube metadata for batch ${batch[0]?.videoId}: ${(err as Error).message}`);
+    } catch {
+      for (const video of batch) {
+        failedVideoIds.add(video.videoId);
+        metadataFailureDetails.push({ videoId: video.videoId, reason: "YouTube API batch request failed" });
+      }
+      console.error(`Failed to fetch YouTube metadata for batch ${batch[0]?.videoId}`);
     }
   }
 
@@ -139,6 +146,13 @@ async function main() {
         liveStreamingDetails: metadata?.liveStreamingDetails ?? null,
       };
     });
+  const unknownAfterReclassification = videoRows
+    .filter((video) => afterTypes.get(video.videoId) === "unknown")
+    .map((video) => ({
+      videoId: video.videoId,
+      title: video.title,
+      reason: metadataFailureDetails.find((failure) => failure.videoId === video.videoId)?.reason ?? "classification material missing",
+    }));
   const summary = {
     mode: apply ? "apply" : "dry-run",
     videosScanned: videoRows.length,
@@ -167,6 +181,8 @@ async function main() {
       liveChanges: changes.filter((change) => change.before === "live" || change.after === "live"),
     },
     requestedVideoChecks,
+    metadataFailures: metadataFailureDetails,
+    unknownAfterReclassification,
     updated: apply ? updates.length : 0,
   };
 

@@ -24,13 +24,29 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 3600, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }).contentType).toBe("standard");
   });
 
+  test("prioritizes a long completed live archive over a shorts hashtag", () => {
+    expect(
+      classifyVideoContent({
+        title: "\u9577\u6642\u9593\u914d\u4fe1\u30a2\u30fc\u30ab\u30a4\u30d6 #shorts",
+        durationSeconds: 27589,
+        liveBroadcastContent: "none",
+        liveStreamingDetails: {
+          actualStartTime: "2026-07-17T01:21:53Z",
+          actualEndTime: "2026-07-17T09:01:45Z",
+        },
+      }).contentType,
+    ).toBe("live");
+  });
+
   test("does not downgrade an existing live row when archive metadata is inconclusive", () => {
     expect(classifyVideoContent({ title: "こあげホール実践実機配信", durationSeconds: 3600, liveBroadcastContent: "none", existingContentType: "live" }).contentType).toBe("live");
   });
 
   test("does not classify live-related clips as live", () => {
     expect(classifyVideoContent({ title: "\u751f\u914d\u4fe1\u306e\u898b\u3069\u3053\u308d\u307e\u3068\u3081\u30b7\u30e7\u30fc\u30c8", durationSeconds: 45 }).contentType).toBe("short");
+    expect(classifyVideoContent({ title: "\u751f\u914d\u4fe1\u306e\u898b\u3069\u3053\u308d #shorts", durationSeconds: 42 }).contentType).toBe("short");
     expect(classifyVideoContent({ title: "\u901a\u5e38\u5c3a\u306e\u751f\u914d\u4fe1\u307e\u3068\u3081", durationSeconds: 600 }).contentType).toBe("standard");
+    expect(classifyVideoContent({ title: "\u751f\u914d\u4fe1\u306e\u898b\u3069\u3053\u308d\u7de8\u96c6\u307e\u3068\u3081", durationSeconds: 600 }).contentType).toBe("standard");
     expect(classifyVideoContent({ title: "\u3010\u6b4c\u3063\u3066\u307f\u305f\u3011\u4e59\u5973\u30d5\u30a7\u30b9\u30c6\u30a3\u30d0\u30eb", durationSeconds: 240 }).contentType).toBe("standard");
   });
 
