@@ -1,4 +1,4 @@
-import type { VideoContentType } from "./content-type";
+import { isRankableVideoContentType, type VideoContentType } from "./content-type";
 
 export type MachineLinkedVideo = {
   videoId: string;
@@ -19,6 +19,10 @@ export function excludeManualExcludedLinks<T extends MachineLinkedVideo>(rows: r
 }
 
 export const selectConfirmedMachineVideos = excludeManualExcludedLinks;
+
+export function selectRankableMachineVideos<T extends MachineLinkedVideo>(rows: readonly T[]) {
+  return selectConfirmedMachineVideos(rows).filter((row) => isRankableVideoContentType(row.contentType));
+}
 
 export function countMachineContentTypes(rows: readonly { contentType: VideoContentType }[]) {
   const counts: Record<VideoContentType, number> = { standard: 0, short: 0, live: 0, promotion: 0, unknown: 0 };

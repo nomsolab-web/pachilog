@@ -3,8 +3,8 @@ import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
-import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
-import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, countMachineContentTypes, selectConfirmedMachineVideos } from "../lib/machine-content";
+import { isRankableVideoContentType, isVideoContentType, RANKABLE_VIDEO_CONTENT_TYPES, type VideoContentType } from "../lib/content-type";
+import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, countMachineContentTypes, selectConfirmedMachineVideos, selectRankableMachineVideos } from "../lib/machine-content";
 import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
 import { calculateVideoTrend, sortVideoRankingEntries } from "../lib/video-ranking";
 
@@ -22,9 +22,9 @@ export const machinesRoute = new Hono()
       })
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
-      .where(and(eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD), eq(videos.contentType, "standard")));
-    const confirmedRows = selectConfirmedMachineVideos(rows);
-    const videoIds = [...new Set(confirmedRows.map((row) => row.videoId))];
+      .where(and(eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD), inArray(videos.contentType, RANKABLE_VIDEO_CONTENT_TYPES)));
+    const rankableRows = selectRankableMachineVideos(rows);
+    const videoIds = [...new Set(rankableRows.map((row) => row.videoId))];
     const snapshots =
       videoIds.length > 0
         ? await db.select().from(videoSnapshots).where(inArray(videoSnapshots.videoId, videoIds)).orderBy(desc(videoSnapshots.date))
@@ -32,7 +32,7 @@ export const machinesRoute = new Hono()
     const snapshotsByVideoId = groupSnapshotsByVideoId(snapshots);
     const statsByMachine = new Map<number, { totalViews: number; videoCount: number; recentViews: number; recentVideoCount: number }>();
 
-    for (const row of confirmedRows) {
+    for (const row of rankableRows) {
       const stats = statsByMachine.get(row.machineId) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0 };
       stats.totalViews += row.viewCount;
       stats.videoCount += 1;

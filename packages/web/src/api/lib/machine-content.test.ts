@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { countMachineContentTypes, excludeManualExcludedLinks, selectConfirmedMachineVideos } from "./machine-content";
+import { countMachineContentTypes, excludeManualExcludedLinks, selectConfirmedMachineVideos, selectRankableMachineVideos } from "./machine-content";
 
 describe("machine content filtering", () => {
   const rows = [
@@ -53,5 +53,17 @@ describe("machine content filtering", () => {
     ]);
     expect(responseRows.map((row) => row.videoId)).toEqual(["shared"]);
     expect(countMachineContentTypes(responseRows)).toEqual({ standard: 1, short: 0, live: 0, promotion: 0, unknown: 0 });
+  });
+
+  test("uses only standard, short, and live for machine list ranking stats", () => {
+    const rankable = selectRankableMachineVideos([
+      { videoId: "standard", matchMethod: "alias", matchStatus: "matched", contentType: "standard" as const },
+      { videoId: "short", matchMethod: "alias", matchStatus: "matched", contentType: "short" as const },
+      { videoId: "live", matchMethod: "alias", matchStatus: "matched", contentType: "live" as const },
+      { videoId: "promotion", matchMethod: "alias", matchStatus: "matched", contentType: "promotion" as const },
+      { videoId: "unknown", matchMethod: "alias", matchStatus: "matched", contentType: "unknown" as const },
+      { videoId: "excluded-short", matchMethod: "manual_excluded", matchStatus: "matched", contentType: "short" as const },
+    ]);
+    expect(rankable.map((row) => row.videoId)).toEqual(["standard", "short", "live"]);
   });
 });
