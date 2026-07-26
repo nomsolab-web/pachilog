@@ -81,6 +81,15 @@ function liveReason(input: VideoContentClassificationInput) {
   const liveBroadcastContent = input.liveBroadcastContent?.toLowerCase();
   const details = input.liveStreamingDetails;
   if (liveBroadcastContent === "live" || liveBroadcastContent === "upcoming") return `youtube liveBroadcastContent=${liveBroadcastContent}`;
+  if (
+    details?.actualStartTime &&
+    details.actualEndTime &&
+    typeof input.durationSeconds === "number" &&
+    input.durationSeconds > 180 &&
+    SHORTS_HASHTAG_PATTERN.test(input.title)
+  ) {
+    return "youtube completed live archive overrides shorts hashtag";
+  }
   if (input.existingContentType === "live") return "existing live classification retained because live metadata is inconclusive";
   return null;
 }
