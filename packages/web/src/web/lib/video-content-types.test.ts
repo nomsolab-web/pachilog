@@ -37,21 +37,14 @@ describe("video content type tabs", () => {
   });
 
   test("resets cursor when changing tabs", () => {
-    const params = updateContentTypeSearchParams("?mode=7d&cursor=abc&contentType=standard", "live", {
-      resetCursor: true,
-    });
+    const params = updateContentTypeSearchParams("?mode=7d&cursor=abc&contentType=standard", "live", { resetCursor: true });
     expect(params.get("contentType")).toBe("live");
     expect(params.get("mode")).toBe("7d");
     expect(params.has("cursor")).toBe(false);
   });
 
   test("builds API query params from the selected tab", () => {
-    expect(videoTrendingQueryParams("7d", "promotion", "cursor-1")).toEqual({
-      mode: "7d",
-      contentType: "promotion",
-      limit: "20",
-      cursor: "cursor-1",
-    });
+    expect(videoTrendingQueryParams("7d", "promotion", "cursor-1")).toEqual({ mode: "7d", contentType: "promotion", limit: "20", cursor: "cursor-1" });
     expect(machineDetailQueryParams("unknown")).toEqual({ contentType: "unknown", sort: "rising" });
   });
 
@@ -61,7 +54,7 @@ describe("video content type tabs", () => {
     expect(parseVideoContentType(new URLSearchParams("?contentType=bad").get("contentType"))).toBe("standard");
   });
 
-  test("normalizes legacy type query params while preserving unrelated values", () => {
+  test("normalizes legacy type URLs while preserving unrelated values", () => {
     const legacy = normalizeContentTypeSearchParams("?type=short&mode=7d&cursor=abc");
     expect(legacy.contentType).toBe("short");
     expect(legacy.shouldReplace).toBe(true);
@@ -80,9 +73,7 @@ describe("video content type tabs", () => {
   });
 
   test("keeps provisional snapshot day labels in trend metrics", () => {
-    expect(
-      videoTrendMetricLabel({ hasTrend: true, viewDelta: 1234, viewDeltaPct: 12.34, isProvisional: true, snapshotDays: 3 }),
-    ).toContain("(3日)");
+    expect(videoTrendMetricLabel({ hasTrend: true, viewDelta: 1234, viewDeltaPct: 12.34, isProvisional: true, snapshotDays: 3 })).toContain("(3日)");
     expect(videoTrendMetricLabel({ hasTrend: false, viewDelta: 0, viewDeltaPct: 0 })).toBe("データ蓄積中");
   });
 });

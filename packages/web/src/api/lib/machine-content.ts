@@ -7,13 +7,18 @@ export type MachineLinkedVideo = {
   matchStatus?: string | null;
 };
 
+export const CONFIRMED_MATCH_STATUS = "matched" as const;
+export const EXCLUDED_MACHINE_LINK_METHOD = "manual_excluded" as const;
+
 export function isConfirmedMachineLink(row: Pick<MachineLinkedVideo, "matchMethod" | "matchStatus">) {
-  return row.matchStatus === "matched" && row.matchMethod !== "manual_excluded";
+  return row.matchStatus === CONFIRMED_MATCH_STATUS && row.matchMethod !== EXCLUDED_MACHINE_LINK_METHOD;
 }
 
 export function excludeManualExcludedLinks<T extends MachineLinkedVideo>(rows: readonly T[]) {
   return rows.filter(isConfirmedMachineLink);
 }
+
+export const selectConfirmedMachineVideos = excludeManualExcludedLinks;
 
 export function countMachineContentTypes(rows: readonly { contentType: VideoContentType }[]) {
   const counts: Record<VideoContentType, number> = { standard: 0, short: 0, live: 0, promotion: 0, unknown: 0 };

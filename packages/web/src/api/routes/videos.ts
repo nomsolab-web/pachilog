@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
 import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { clampLimit } from "../lib/pagination";
+import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, selectConfirmedMachineVideos } from "../lib/machine-content";
 import { calculateVideoTrend, decodeVideoRankingCursor, paginateVideoRanking, sortVideoRankingEntries } from "../lib/video-ranking";
 
 const MODES = new Set(["previous", "7d"]);
@@ -41,14 +42,14 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
   const videoIds = videoRows.map((video) => video.videoId);
   const machineTagRows = videoIds.length > 0
     ? await db
-        .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name })
+        .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name, matchStatus: videos.matchStatus, matchMethod: videoMachineLinks.matchMethod, contentType: videos.contentType })
         .from(videoMachineLinks)
         .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id))
         .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
-        .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, "matched")))
+        .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD)))
     : [];
   const machineTagsByVideoId = new Map<string, { id: number; name: string }[]>();
-  for (const row of machineTagRows) {
+  for (const row of selectConfirmedMachineVideos(machineTagRows)) {
     const tags = machineTagsByVideoId.get(row.videoId) ?? [];
     if (!tags.some((tag) => tag.id === row.machineId)) tags.push({ id: row.machineId, name: row.machineName });
     machineTagsByVideoId.set(row.videoId, tags);

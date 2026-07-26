@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { countMachineContentTypes, excludeManualExcludedLinks } from "./machine-content";
+import { countMachineContentTypes, excludeManualExcludedLinks, selectConfirmedMachineVideos } from "./machine-content";
 
 describe("machine content filtering", () => {
   const rows = [
@@ -43,5 +43,15 @@ describe("machine content filtering", () => {
       { videoId: "shared", matchMethod: "alias", matchStatus: "matched", contentType: "standard" as const },
       { videoId: "shared", matchMethod: "manual", matchStatus: "matched", contentType: "standard" as const },
     ]).standard).toBe(1);
+  });
+
+  test("models an API response with an excluded and a valid link for the same video", () => {
+    const responseRows = selectConfirmedMachineVideos([
+      { videoId: "shared", matchMethod: "manual_excluded", matchStatus: "matched", contentType: "standard" as const },
+      { videoId: "shared", matchMethod: "alias", matchStatus: "matched", contentType: "standard" as const },
+      { videoId: "excluded-only", matchMethod: "manual_excluded", matchStatus: "matched", contentType: "short" as const },
+    ]);
+    expect(responseRows.map((row) => row.videoId)).toEqual(["shared"]);
+    expect(countMachineContentTypes(responseRows)).toEqual({ standard: 1, short: 0, live: 0, promotion: 0, unknown: 0 });
   });
 });

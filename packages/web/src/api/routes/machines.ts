@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../database";
 import { channels, machineVotes, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
 import { rateLimit } from "../middleware/rate-limit";
 import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
-import { countMachineContentTypes } from "../lib/machine-content";
+import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, countMachineContentTypes, selectConfirmedMachineVideos } from "../lib/machine-content";
 import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
 import { calculateVideoTrend, sortVideoRankingEntries } from "../lib/video-ranking";
 
@@ -17,11 +17,14 @@ export const machinesRoute = new Hono()
         videoId: videos.videoId,
         viewCount: videos.viewCount,
         contentType: videos.contentType,
+        matchStatus: videos.matchStatus,
+        matchMethod: videoMachineLinks.matchMethod,
       })
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
-      .where(and(eq(videos.matchStatus, "matched"), eq(videos.contentType, "standard")));
-    const videoIds = [...new Set(rows.map((row) => row.videoId))];
+      .where(and(eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD), eq(videos.contentType, "standard")));
+    const confirmedRows = selectConfirmedMachineVideos(rows);
+    const videoIds = [...new Set(confirmedRows.map((row) => row.videoId))];
     const snapshots =
       videoIds.length > 0
         ? await db.select().from(videoSnapshots).where(inArray(videoSnapshots.videoId, videoIds)).orderBy(desc(videoSnapshots.date))
@@ -29,7 +32,7 @@ export const machinesRoute = new Hono()
     const snapshotsByVideoId = groupSnapshotsByVideoId(snapshots);
     const statsByMachine = new Map<number, { totalViews: number; videoCount: number; recentViews: number; recentVideoCount: number }>();
 
-    for (const row of rows) {
+    for (const row of confirmedRows) {
       const stats = statsByMachine.get(row.machineId) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0 };
       stats.totalViews += row.viewCount;
       stats.videoCount += 1;
@@ -74,12 +77,13 @@ export const machinesRoute = new Hono()
       .from(videoMachineLinks)
       .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
       .innerJoin(channels, eq(videos.channelId, channels.id))
-      .where(and(eq(videoMachineLinks.machineId, id), eq(videos.matchStatus, "matched")))
+      .where(and(eq(videoMachineLinks.machineId, id), eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD)))
       .orderBy(desc(videos.updatedAt));
 
-    const mentions = linkedVideos.filter((video) => contentTypes.includes(video.contentType));
+    const confirmedLinkedVideos = selectConfirmedMachineVideos(linkedVideos);
+    const mentions = confirmedLinkedVideos.filter((video) => contentTypes.includes(video.contentType));
     const uniqueMentions = [...new Map(mentions.map((mention) => [mention.videoId, mention])).values()];
-    const allConfirmedVideos = [...new Map(linkedVideos.map((mention) => [mention.videoId, mention])).values()];
+    const allConfirmedVideos = [...new Map(confirmedLinkedVideos.map((mention) => [mention.videoId, mention])).values()];
     const videoIds = allConfirmedVideos.map((video) => video.videoId);
     const snapshots = videoIds.length > 0
       ? await db.select().from(videoSnapshots).where(inArray(videoSnapshots.videoId, videoIds)).orderBy(desc(videoSnapshots.date))
@@ -87,14 +91,14 @@ export const machinesRoute = new Hono()
     const snapshotsByVideoId = groupSnapshotsByVideoId(snapshots);
     const machineTags = videoIds.length > 0
       ? await db
-          .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name })
+        .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name, matchStatus: videos.matchStatus, matchMethod: videoMachineLinks.matchMethod, contentType: videos.contentType })
           .from(videoMachineLinks)
           .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id))
           .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
-          .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, "matched")))
+          .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD)))
       : [];
     const machineTagsByVideoId = new Map<string, { id: number; name: string }[]>();
-    for (const tag of machineTags) {
+    for (const tag of selectConfirmedMachineVideos(machineTags)) {
       const tags = machineTagsByVideoId.get(tag.videoId) ?? [];
       if (!tags.some((item) => item.id === tag.machineId)) tags.push({ id: tag.machineId, name: tag.machineName });
       machineTagsByVideoId.set(tag.videoId, tags);
