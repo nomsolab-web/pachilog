@@ -14,12 +14,12 @@ let ipCounter = 0;
 describe("machine votes API", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "pachilog-machine-votes-"));
-    const databaseUrl = `file:${join(tempDir, "test.db")}`;
+    const databaseUrl = process.env.DATABASE_URL || `file:${join(tmpdir(), "pachilog-shared-test.db")}`;
     process.env.DATABASE_URL = databaseUrl;
     process.env.DATABASE_AUTH_TOKEN = "";
     client = createClient({ url: databaseUrl });
     await client.batch([
-      `CREATE TABLE machines (
+      `CREATE TABLE IF NOT EXISTS machines (
         id integer PRIMARY KEY AUTOINCREMENT,
         name text NOT NULL,
         short_name text,
@@ -35,7 +35,7 @@ describe("machine votes API", () => {
         created_at integer NOT NULL,
         updated_at integer
       )`,
-      `CREATE TABLE machine_votes (
+      `CREATE TABLE IF NOT EXISTS machine_votes (
         id integer PRIMARY KEY AUTOINCREMENT,
         machine_id integer NOT NULL,
         vote_type text NOT NULL,
@@ -43,20 +43,21 @@ describe("machine votes API", () => {
         created_at integer NOT NULL,
         FOREIGN KEY(machine_id) REFERENCES machines(id) ON DELETE cascade
       )`,
-      `CREATE UNIQUE INDEX machine_vote_fingerprint_idx ON machine_votes (machine_id, voter_fingerprint)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (1, 'machine one', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (2, 'machine two', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (3, 'machine three', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (4, 'machine four', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (5, 'machine five', 0)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS machine_vote_fingerprint_idx ON machine_votes (machine_id, voter_fingerprint)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (1, 'machine one', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (2, 'machine two', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (3, 'machine three', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (4, 'machine four', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (5, 'machine five', 0)`,
     ]);
     app = (await import("../index")).default;
     appDbClient = (await import("../database")).client;
   });
 
   afterAll(async () => {
-    appDbClient.close();
-    client.close();
+    // Keep clients open to avoid clashing with rankings.test.ts
+    // appDbClient.close();
+    // client.close();
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   });
 

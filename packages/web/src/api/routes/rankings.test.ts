@@ -13,12 +13,12 @@ let tempDir: string;
 describe("rankings API route", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "pachilog-rankings-"));
-    const databaseUrl = `file:${join(tempDir, "test.db")}`;
+    const databaseUrl = process.env.DATABASE_URL || `file:${join(tmpdir(), "pachilog-shared-test.db")}`;
     process.env.DATABASE_URL = databaseUrl;
     process.env.DATABASE_AUTH_TOKEN = "";
     client = createClient({ url: databaseUrl });
     await client.batch([
-      `CREATE TABLE channels (
+      `CREATE TABLE IF NOT EXISTS channels (
         id integer PRIMARY KEY AUTOINCREMENT,
         name text NOT NULL,
         youtube_channel_id text NOT NULL,
@@ -29,7 +29,7 @@ describe("rankings API route", () => {
         created_at integer,
         updated_at integer
       )`,
-      `CREATE TABLE channel_snapshots (
+      `CREATE TABLE IF NOT EXISTS channel_snapshots (
         id integer PRIMARY KEY AUTOINCREMENT,
         channel_id integer NOT NULL,
         subscriber_count integer,
@@ -46,8 +46,9 @@ describe("rankings API route", () => {
   });
 
   afterAll(async () => {
-    appDbClient.close();
-    client.close();
+    // Keep clients open to avoid clashing
+    // appDbClient.close();
+    // client.close();
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   });
 
@@ -62,10 +63,10 @@ describe("rankings API route", () => {
 
   test("returns latestDate correctly even if all channels are insufficient (ranking list is empty)", async () => {
     await client.batch([
-      `INSERT INTO channels (id, name, youtube_channel_id, handle, category, active) 
+      `INSERT OR IGNORE INTO channels (id, name, youtube_channel_id, handle, category, active) 
        VALUES (1, 'Test Channel', 'UC123', '@test', 'media', 1)`,
-      `INSERT INTO channel_snapshots (channel_id, subscriber_count, date, collected_at) 
-       VALUES (1, 1000, '2026-07-27', 1716768000000)`
+      `INSERT OR IGNORE INTO channel_snapshots (id, channel_id, subscriber_count, date, collected_at) 
+       VALUES (1, 1, 1000, '2026-07-27', 1716768000000)`
     ]);
 
     const response = await app.request("/rankings?period=7");
