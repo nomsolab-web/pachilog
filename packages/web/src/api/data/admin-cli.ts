@@ -249,12 +249,9 @@ async function rematchAll(options: string[]) {
       insertCount++;
     }
 
-    const finalLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.videoId, video.videoId));
-
-    const hasActiveMatches = finalLinks.some(l => l.matchMethod !== "manual_excluded");
     const status = video.matchStatus === "manual" || video.matchStatus === "manual_excluded"
       ? video.matchStatus
-      : hasActiveMatches ? "matched" : "unmatched";
+      : decision.plannedMatchStatus;
 
     await db
       .update(videosTable)

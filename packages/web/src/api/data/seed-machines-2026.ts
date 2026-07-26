@@ -81,4 +81,28 @@ export const SEED_MACHINES_2026: SeedMachine[] = [
   { ...s("スマスロ鉄拳6", "山佐ネクスト", "2026-01-05"), sourceUrl: pioneer },
   { ...s("スマート沖スロ ニューキングハナハナV", "パイオニア", "2026-01-05"), sourceUrl: pioneer },
   { ...s("ニューキングハナハナV-30", "パイオニア", "2026-01-05"), sourceUrl: pioneer },
+  p("e甲鉄城のカバネリ2 咲かせや燦然", "サミー", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eFダンベル何キロ持てる?2", "SANKYO", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eアクダマドライブ", "三洋物産", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eキン肉マン", "SANKYO", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("e86-エイティシックス-", "アムテックス", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("eリング 最恐領域", "オレンジ", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("eルパン三世VSキャッツ・アイ", "アムテックス", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eひきこまり吸血姫の悶々", "藤商事", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eライザのアトリエ", "京楽産業.", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eギンパラ VIVA FESTA", "三洋物産", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("PシャカRUSH Z Jr.", "マルホン", "2026-06-22", pWorld + "?year_month=2026-06"),
+  p("e化物語 鬼99ver.", "サミー", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("PAスーパー海物語IN沖縄6 Withえなこ", "三洋物産", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("eFデッドマウント・デスプレイ 魂神9000", "SANKYO", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("ぱちんこ 必殺仕事人VI", "オッケー.", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("e魔法少女リリカルなのは", "三洋物産", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("e虚構推理", "D-light", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("P入るんスタート×織田信奈の野望", "高尾", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("デカスタeベルセルク無双 第2章 10連撃Ver.", "ニューギン", "2026-07-21", pWorld + "?year_month=2026-07"),
 ];
+
+for (const machine of SEED_MACHINES_2026) {
+  if (machine.maker === "京楽") machine.maker = "京楽産業.";
+  if (machine.name.includes("鉄拳") && machine.maker === "山佐ネクスト") machine.sourceUrl = slotList;
+}

@@ -64,4 +64,36 @@ describe("machine title matching", () => {
     const match = findDetailedMachineMatches("無関係な動画タイトル", machines);
     expect(match).toEqual([]);
   });
+
+  test("matches official name, shortName, and uniqueAlias with expected ids and methods", () => {
+    const machines = [
+      { id: 10, name: "P Dragon Quest 12", shortName: "Dragon Quest 12" },
+      { id: 11, name: "P Official Machine Beta", uniqueAliases: ["Beta Special"] },
+    ];
+    expect(findDetailedMachineMatches("P Dragon Quest 12 実戦", machines)).toMatchObject([
+      { machineId: 10, matchMethod: "exact_name" },
+    ]);
+    expect(findDetailedMachineMatches("Dragon Quest 12 実戦", machines)).toMatchObject([
+      { machineId: 10, matchMethod: "alias" },
+    ]);
+    expect(findDetailedMachineMatches("Beta Special 実戦", machines)).toMatchObject([
+      { machineId: 11, matchMethod: "alias" },
+    ]);
+  });
+
+  test("requires resolvingKeyword for ambiguousAlias and rejects a general word alone", () => {
+    const machines = [{ id: 12, name: "P Resolving Machine", ambiguousAliases: ["popular machine"], resolvingKeywords: ["resolving machine"] }];
+    expect(findDetailedMachineMatches("popular machine 実戦", machines)).toEqual([]);
+    expect(findDetailedMachineMatches("popular machine resolving machine", machines)).toMatchObject([
+      { machineId: 12, matchMethod: "alias" },
+    ]);
+  });
+
+  test("keeps specification variants separate and prefers the longer machine name", () => {
+    const machines = [
+      { id: 13, name: "P Ocean 5" },
+      { id: 14, name: "P Ocean 5 Special" },
+    ];
+    expect(findDetailedMachineMatches("P Ocean 5 Special 実戦", machines).map((match) => match.machineId)).toEqual([14]);
+  });
 });

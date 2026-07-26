@@ -16,6 +16,7 @@ describe("machine rematch planning", () => {
     const first = planMachineRematch(videos, machines, links);
     expect(first[0].linksToAdd).toEqual([]);
     expect(first[0].preserveManualLinkCount).toBe(2);
+    expect(first[0].plannedMatchStatus).toBe("matched");
     const second = planMachineRematch(videos, machines, [...links]);
     expect(second[0].linksToAdd).toEqual(first[0].linksToAdd);
   });
@@ -26,6 +27,7 @@ describe("machine rematch planning", () => {
     const decision = planMachineRematch(videos, machines, existing)[0];
     expect(decision.matches.map((match) => match.machineId)).toEqual([1]);
     expect(decision.linksToAdd).toEqual([]);
+    expect(decision.plannedMatchStatus).toBe("matched");
   });
 
   test("does not confirm an ambiguous alias without its resolver", () => {
@@ -33,6 +35,29 @@ describe("machine rematch planning", () => {
     const decision = planMachineRematch(videos, machines, [])[0];
     expect(decision.matches).toEqual([]);
     expect(decision.ambiguousMachineIds).toEqual([2]);
+    expect(decision.linksToAdd).toEqual([]);
+    expect(decision.plannedMatchStatus).toBe("ambiguous");
+  });
+
+  test("uses unmatched for excluded-only and matched when an active link coexists", () => {
+    const excludedOnly = planMachineRematch(
+      [{ videoId: "v4", title: "無関係な動画", matchStatus: "matched" }],
+      machines,
+      [{ videoId: "v4", machineId: 2, matchConfidence: 0, matchMethod: "manual_excluded" }],
+    )[0];
+    expect(excludedOnly.plannedMatchStatus).toBe("unmatched");
+
+    const mixed = planMachineRematch(
+      [{ videoId: "v5", title: "機種A 実戦", matchStatus: "matched" }],
+      machines,
+      [
+        { videoId: "v5", machineId: 1, matchConfidence: 100, matchMethod: "manual" },
+        { videoId: "v5", machineId: 2, matchConfidence: 0, matchMethod: "manual_excluded" },
+      ],
+    )[0];
+    expect(mixed.plannedMatchStatus).toBe("matched");
+    expect(mixed.linksToAdd).toEqual([]);
+    expect(mixed.preserveManualLinkCount).toBe(2);
   });
 
   test("reports counts without changing the database", () => {

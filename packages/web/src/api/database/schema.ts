@@ -57,7 +57,7 @@ export const videos = sqliteTable("videos", {
   contentTypeConfidence: integer("content_type_confidence").notNull().default(0),
   durationSeconds: integer("duration_seconds"),
   liveBroadcastContent: text("live_broadcast_content"),
-  matchStatus: text("match_status", { enum: ["pending", "matched", "unmatched", "manual_excluded"] })
+  matchStatus: text("match_status", { enum: ["pending", "matched", "ambiguous", "unmatched", "manual", "manual_excluded"] })
     .notNull()
     .default("pending"),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -101,6 +101,9 @@ export const machines = sqliteTable("machines", {
   name: text("name").notNull(),
   shortName: text("short_name"),
   aliases: text("aliases", { mode: "json" }).$type<string[]>(),
+  uniqueAliases: text("unique_aliases", { mode: "json" }).$type<string[]>(),
+  ambiguousAliases: text("ambiguous_aliases", { mode: "json" }).$type<string[]>(),
+  resolvingKeywords: text("resolving_keywords", { mode: "json" }).$type<string[]>(),
   excludeTerms: text("exclude_terms", { mode: "json" }).$type<string[]>(),
   type: text("type"),
   maker: text("maker"),

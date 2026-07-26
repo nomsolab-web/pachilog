@@ -5,26 +5,14 @@ import { eq } from "drizzle-orm";
 import { db } from "../database";
 import { machines } from "../database/schema";
 import { SEED_MACHINES } from "./seed-machines";
+import { buildMachineSeedValues } from "./machine-seed-values";
 
 async function main() {
   let inserted = 0;
   let updated = 0;
   for (const m of SEED_MACHINES) {
     const existing = await db.select().from(machines).where(eq(machines.name, m.name));
-    const values = Object.fromEntries(
-      Object.entries({
-        name: m.name,
-        maker: m.maker,
-        releaseDate: m.releaseDate,
-        type: m.type,
-        shortName: m.shortName,
-        aliases: m.aliases,
-        excludeTerms: m.excludeTerms,
-        series: m.series,
-        sourceUrl: m.sourceUrl,
-        officialUrl: m.officialUrl,
-      }).filter(([, value]) => value !== undefined)
-    );
+    const values = buildMachineSeedValues(m);
     if (existing.length > 0) {
       await db.update(machines).set(values).where(eq(machines.id, existing[0].id));
       updated += 1;

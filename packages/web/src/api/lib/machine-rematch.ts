@@ -21,6 +21,8 @@ export type RematchVideo = {
   matchStatus: string;
 };
 
+export type PlannedMatchStatus = "matched" | "ambiguous" | "unmatched" | "manual" | "manual_excluded";
+
 export type RematchLink = {
   videoId: string;
   machineId: number;
@@ -33,6 +35,7 @@ export type RematchDecision = {
   matches: MachineMatchResult[];
   linksToAdd: MachineMatchResult[];
   ambiguousMachineIds: number[];
+  plannedMatchStatus: PlannedMatchStatus;
   preserveManualLinkCount: number;
   preservedAutoLinkCount: number;
 };
@@ -59,11 +62,21 @@ export function planMachineRematch(
       (match) => !protectedMachineIds.has(match.machineId) && !existingAutoMachineIds.has(match.machineId),
     );
 
+    const hasActiveLink = existing.some((link) => link.matchMethod !== "manual_excluded");
+    const ambiguousMachineIds = findAmbiguousMachineCandidates(video.title, machines).map((machine) => machine.id);
+    const plannedMatchStatus: PlannedMatchStatus =
+      video.matchStatus === "manual" || video.matchStatus === "manual_excluded"
+        ? video.matchStatus
+        : hasActiveLink || linksToAdd.length > 0
+          ? "matched"
+          : ambiguousMachineIds.length > 0 ? "ambiguous" : "unmatched";
+
     return {
       videoId: video.videoId,
       matches,
       linksToAdd,
-      ambiguousMachineIds: findAmbiguousMachineCandidates(video.title, machines).map((machine) => machine.id),
+      ambiguousMachineIds,
+      plannedMatchStatus,
       preserveManualLinkCount: existing.filter(
         (link) => link.matchMethod === "manual" || link.matchMethod === "manual_excluded",
       ).length,
@@ -77,22 +90,11 @@ export function summarizeMachineRematch(
   links: readonly RematchLink[],
   decisions: readonly RematchDecision[],
 ) {
-  const activeLinks = links.filter((link) => link.matchMethod !== "manual_excluded");
-  const matchedVideoIds = new Set(activeLinks.map((link) => link.videoId));
-  for (const decision of decisions) {
-    if (decision.linksToAdd.length > 0) matchedVideoIds.add(decision.videoId);
-  }
-  const ambiguousVideoIds = new Set(
-    decisions
-      .filter((decision) => decision.matches.length === 0 && decision.ambiguousMachineIds.length > 0)
-      .map((decision) => decision.videoId),
-  );
-
   return {
     totalVideos: videos.length,
-    matched: videos.filter((video) => matchedVideoIds.has(video.videoId)).length,
-    ambiguous: ambiguousVideoIds.size,
-    unmatched: videos.filter((video) => !matchedVideoIds.has(video.videoId) && !ambiguousVideoIds.has(video.videoId)).length,
+    matched: decisions.filter((decision) => decision.plannedMatchStatus === "matched").length,
+    ambiguous: decisions.filter((decision) => decision.plannedMatchStatus === "ambiguous").length,
+    unmatched: decisions.filter((decision) => decision.plannedMatchStatus === "unmatched").length,
     existingLinkCount: links.length,
     linksToAdd: decisions.reduce((count, decision) => count + decision.linksToAdd.length, 0),
     manualExcludedPreserved: links.filter((link) => link.matchMethod === "manual_excluded").length,
