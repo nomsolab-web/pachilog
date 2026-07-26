@@ -49,6 +49,8 @@ export function selectComparisonSnapshots<T extends SnapshotLike>(
       if (snapshot.date === latest.date) continue;
       // Requirement 4: exclude future baselines relative to latest date
       if (snapshot.date >= latest.date) continue;
+      // Requirement 3: Skip snapshots with null/undefined subscriber counts
+      if (snapshot.subscriberCount === null || snapshot.subscriberCount === undefined) continue;
 
       const diff = dateDiffAbs(snapshot.date, targetDate);
       if (diff < minDiff) {
