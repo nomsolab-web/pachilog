@@ -1,0 +1,108 @@
+import type { SeedMachine } from "./seed-machines";
+
+const pWorld = "https://opt.p-world.co.jp/database/machine/introduce_calendar.cgi";
+const slotList = "https://shinnosuke-ch.com/2026%E5%B9%B4%E3%83%91%E3%83%81%E3%82%B9%E3%83%AD%E5%B0%8E%E5%85%A5%E6%A9%9F%E7%A8%AE%E4%B8%80%E8%A6%A7/";
+const pioneer = "https://www.slot-pioneer.co.jp/products/2026.html";
+const p = (name: string, maker: string, releaseDate: string, sourceUrl: string): SeedMachine => ({
+  name,
+  maker,
+  type: "pachinko",
+  releaseDate,
+  sourceUrl,
+});
+const s = (name: string, maker: string, releaseDate: string): SeedMachine => ({
+  name,
+  maker,
+  type: "pachislot",
+  releaseDate,
+  sourceUrl: slotList,
+});
+
+// Names and dates are taken from the 2026 P-WORLD calendar and the published
+// 2026 slot introduction list. Aliases stay empty until a distinctive term is
+// verified; this prevents short series names from creating false matches.
+export const SEED_MACHINES_2026: SeedMachine[] = [
+  p("e範馬刃牙 199ver.", "アムテックス", "2026-01-19", pWorld + "?year_month=2026-01"),
+  p("P閃乱カグラ 189大入りver.", "D-light", "2026-01-19", pWorld + "?year_month=2026-01"),
+  p("e ULTRAMAN 4500 超ライト", "オッケー.", "2026-01-19", pWorld + "?year_month=2026-01"),
+  p("e 盾の勇者の成り上がり アルティメット199ver.", "サミー", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("PF彼女、お借りします LT-Light ver.", "SANKYO", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("PFうたわれるもの LT-Light ver.", "SANKYO", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("PA清流物語4 ウキウキ79ver.", "サンスリー", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("eようこそ実力至上主義の教室へ", "サンセイR&D", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("e吉宗 極乗3000ver.", "大都技研", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("P超甘LT華牌RR 1/49×99de遊タイム", "豊丸", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("eソードアート・オンライン 閃光の軌跡 99Ver.", "京楽", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("Pリングにかけろ1 129ver.", "ニューギン", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("eゴジラ対エヴァンゲリオン2 超デカゴールド", "ビスティ", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("Pゴジラ対エヴァンゲリオン2 超デカシルバー", "ビスティ", "2026-01-05", pWorld + "?year_month=2026-01"),
+  p("eF BASTARD!! -暗黒の破壊神-", "SANKYO", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("e真・北斗無双 第5章 夢幻闘双", "サミー", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("P黄門ちゃま寿限無 LLサイズ 259ver.", "平和", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("P黄門ちゃま寿限無 99ver.", "平和", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("e異世界でチート能力を手にした俺は現実世界をも無双する", "藤商事", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("P冴えない彼女の育てかた 99ver.", "大都技研", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("P俺の妹がこんなに可愛いわけがない。攻略!!スキップ159ver.", "京楽", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("eAぷらねっとアポロGO", "豊丸", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("PAぱちんこ乗物娘 with CYBERJAPANDANCERS 2nd season 59ver.", "ニューギン", "2026-02-02", pWorld + "?year_month=2026-02"),
+  p("PAぱちんこ乗物娘 with CYBERJAPANDANCERS 2nd season 77ver.", "ニューギン", "2026-02-02", pWorld + "?year_month=2026-02"),
+  s("Lパチスロ からくりサーカス2", "SANKYO", "2026-07-06"),
+  s("戦国コレクション6", "コナミアミューズメント", "2026-07-06"),
+  s("スマスロケロット5BT", "山佐ネクスト", "2026-07-06"),
+  s("L ULTRAMAN 最終決戦", "京楽産業.", "2026-07-06"),
+  s("L南国育ちSPECIAL", "平和", "2026-07-06"),
+  s("ローティス", "北電子", "2026-07-06"),
+  { ...s("スマート沖スロ ダークハイビ", "パイオニア", "2026-06-22"), sourceUrl: pioneer },
+  s("スロット ソードアート・オンラインII", "大都技研", "2026-06-08"),
+  s("L戦国乙女5 業火を穿つ宿焔の双刃", "平和", "2026-06-08"),
+  s("スマスロ BIRDIE WING -Golf Girls' Story-", "ユニバーサルエンターテインメント", "2026-06-08"),
+  s("LBスロットGALFY", "オーイズミ", "2026-05-25"),
+  s("スマスロ バイオハザードRE:3", "ユニバーサルエンターテインメント", "2026-05-11"),
+  s("スマスロビッグドリーム THE GOLDEN PUSHER", "サミー", "2026-05-11"),
+  s("Lタクトオーパス デスティニー", "平和", "2026-05-11"),
+  s("スマスロスーパーリオエース2", "山佐ネクスト", "2026-05-11"),
+  s("スマスロ ミリオンゴッド-神々の軌跡-", "ユニバーサルエンターテインメント", "2026-04-20"),
+  s("Lパチスロ 機動戦士ガンダムユニコーン 覚醒DRIVE", "ビスティ", "2026-04-20"),
+  s("アニマルスロットドッチ", "北電子", "2026-04-20"),
+  s("A-SLOT+ 異世界かるてっと BT", "サミー", "2026-04-06"),
+  s("真打 吉宗", "大都技研", "2026-04-06"),
+  s("スマスロヨルムンガンド", "山佐ネクスト", "2026-04-06"),
+  s("L虚構推理", "大一商会", "2026-04-06"),
+  s("Lアクダマドライブ", "三洋物産", "2026-04-06"),
+  s("スマスロ 甲鉄城のカバネリ 海門決戦", "サミー", "2026-03-02"),
+  s("スマスロ サンダーV", "ユニバーサルエンターテインメント", "2026-03-02"),
+  s("スマスロ 攻殻機動隊", "サミー", "2026-02-02"),
+  s("Lパチスロ 炎炎ノ消防隊2", "SANKYO", "2026-02-02"),
+  s("スマスロ ゴブリンスレイヤーII", "藤商事", "2026-02-02"),
+  s("Lパチスロうみねこのなく頃に2", "オーイズミ", "2026-02-02"),
+  s("L範馬刃牙", "平和", "2026-02-02"),
+  s("スマスロ ハナビ", "ユニバーサルエンターテインメント", "2026-02-02"),
+  s("スマスロ 北斗の拳 転生の章2", "サミー", "2026-01-05"),
+  { ...s("スマスロ鉄拳6", "山佐ネクスト", "2026-01-05"), sourceUrl: pioneer },
+  { ...s("スマート沖スロ ニューキングハナハナV", "パイオニア", "2026-01-05"), sourceUrl: pioneer },
+  { ...s("ニューキングハナハナV-30", "パイオニア", "2026-01-05"), sourceUrl: pioneer },
+  p("e甲鉄城のカバネリ2 咲かせや燦然", "サミー", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eFダンベル何キロ持てる?2", "SANKYO", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eアクダマドライブ", "三洋物産", "2026-03-02", pWorld + "?year_month=2026-03"),
+  p("eキン肉マン", "SANKYO", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("e86-エイティシックス-", "アムテックス", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("eリング 最恐領域", "オレンジ", "2026-04-20", pWorld + "?year_month=2026-04"),
+  p("eルパン三世VSキャッツ・アイ", "アムテックス", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eひきこまり吸血姫の悶々", "藤商事", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eライザのアトリエ", "京楽産業.", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("eギンパラ VIVA FESTA", "三洋物産", "2026-05-11", pWorld + "?year_month=2026-05"),
+  p("PシャカRUSH Z Jr.", "マルホン", "2026-06-22", pWorld + "?year_month=2026-06"),
+  p("e化物語 鬼99ver.", "サミー", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("PAスーパー海物語IN沖縄6 Withえなこ", "三洋物産", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("eFデッドマウント・デスプレイ 魂神9000", "SANKYO", "2026-06-08", pWorld + "?year_month=2026-06"),
+  p("ぱちんこ 必殺仕事人VI", "オッケー.", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("e魔法少女リリカルなのは", "三洋物産", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("e虚構推理", "D-light", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("P入るんスタート×織田信奈の野望", "高尾", "2026-07-06", pWorld + "?year_month=2026-07"),
+  p("デカスタeベルセルク無双 第2章 10連撃Ver.", "ニューギン", "2026-07-21", pWorld + "?year_month=2026-07"),
+];
+
+for (const machine of SEED_MACHINES_2026) {
+  if (machine.maker === "京楽") machine.maker = "京楽産業.";
+  if (machine.name.includes("鉄拳") && machine.maker === "山佐ネクスト") machine.sourceUrl = slotList;
+}

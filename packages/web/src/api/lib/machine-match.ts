@@ -4,6 +4,9 @@ type MachineMatchInput = {
   shortName?: string | null;
   aliases?: string[] | null;
   excludeTerms?: string[] | null;
+  uniqueAliases?: string[] | null;
+  ambiguousAliases?: string[] | null;
+  resolvingKeywords?: string[] | null;
 };
 
 export type MachineMatchResult = {
@@ -40,22 +43,47 @@ export function findDetailedMachineMatches(title: string, machines: readonly Mac
     }
 
     // 3. Check shortName and aliases (alias match)
-    const aliasTerms = [machine.shortName, ...(machine.aliases ?? [])].filter(
+    const aliasTerms = [
+      machine.shortName,
+      ...(machine.aliases ?? []),
+      ...(machine.uniqueAliases ?? []),
+    ].filter(
       (term): term is string => !!term
     );
 
+    let bestAliasMatch: MachineMatchResult | undefined;
     for (const term of aliasTerms) {
       if (!isSafeMachineTerm(term)) continue;
       const normTerm = normalizeText(term);
       if (normTerm && normalizedTitle.includes(normTerm)) {
-        candidates.push({
+        const candidate: MachineMatchResult = {
           machineId: machine.id,
           matchConfidence: 85,
           matchMethod: "alias",
           matchedTerm: term,
-        });
-        break; // Match one alias per machine is enough
+        };
+        if (!bestAliasMatch || candidate.matchedTerm.length > bestAliasMatch.matchedTerm.length) {
+          bestAliasMatch = candidate;
+        }
       }
+    }
+
+    const ambiguousTerm = (machine.ambiguousAliases ?? []).find((term) => {
+      if (!isSafeMachineTerm(term)) return false;
+      return normalizedTitle.includes(normalizeText(term));
+    });
+    const hasResolver = (machine.resolvingKeywords ?? []).some((term) =>
+      normalizedTitle.includes(normalizeText(term))
+    );
+    if (bestAliasMatch) {
+      candidates.push(bestAliasMatch);
+    } else if (ambiguousTerm && hasResolver) {
+      candidates.push({
+        machineId: machine.id,
+        matchConfidence: 75,
+        matchMethod: "alias",
+        matchedTerm: ambiguousTerm,
+      });
     }
   }
 
@@ -84,18 +112,36 @@ export function findAmbiguousMachineCandidates(title: string, machines: readonly
   const normalizedTitle = normalizeText(title);
   return machines.filter((machine) => {
     if ((machine.excludeTerms ?? []).some((term) => normalizedTitle.includes(normalizeText(term)))) return false;
-    if (machineTerms(machine).some((term) => normalizedTitle.includes(normalizeText(term)))) return false;
+    const confirmedTerms = [
+      machine.name,
+      machine.shortName,
+      ...(machine.aliases ?? []),
+      ...(machine.uniqueAliases ?? []),
+    ].filter((term): term is string => !!term && isSafeMachineTerm(term));
+    if (confirmedTerms.some((term) => normalizedTitle.includes(normalizeText(term)))) return false;
     return weakMachineTokens(machine).some((token) => normalizedTitle.includes(normalizeText(token)));
   });
 }
 
 export function machineTerms(machine: MachineMatchInput) {
-  const terms = [machine.name, machine.shortName, ...(machine.aliases ?? [])].filter((term): term is string => !!term);
+  const terms = [
+    machine.name,
+    machine.shortName,
+    ...(machine.aliases ?? []),
+    ...(machine.uniqueAliases ?? []),
+    ...(machine.ambiguousAliases ?? []),
+  ].filter((term): term is string => !!term);
   return [...new Set(terms.map((term) => term.trim()).filter(isSafeMachineTerm))];
 }
 
 export function weakMachineTokens(machine: MachineMatchInput) {
-  const source = [machine.name, machine.shortName, ...(machine.aliases ?? [])].filter((term): term is string => !!term);
+  const source = [
+    machine.name,
+    machine.shortName,
+    ...(machine.aliases ?? []),
+    ...(machine.uniqueAliases ?? []),
+    ...(machine.ambiguousAliases ?? []),
+  ].filter((term): term is string => !!term);
   const tokens = source.flatMap((term) => term.normalize("NFKC").split(/[\s・･\-_()[\]【】「」『』]+/));
   return [...new Set(tokens.map((token) => token.trim()).filter(isSafeWeakToken))];
 }
