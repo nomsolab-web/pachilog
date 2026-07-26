@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX } from "lucide-react";
+import { ArrowLeft, CalendarDays, ExternalLink, Factory, Film, SearchX, TrendingUp, Video, Eye } from "lucide-react";
+import { Link, useLocation, useParams } from "wouter";
 import { api } from "../lib/api";
 import { MachineVoteWidget } from "../components/machine-vote-widget";
 import { VideoCard } from "../components/video-card";
@@ -9,289 +9,109 @@ import {
   VIDEO_CONTENT_TYPE_TABS,
   machineDetailQueryParams,
   parseVideoContentType,
-  updateContentTypeSearchParams,
+  videoContentTypeLabel,
   type VideoContentTypeValue,
 } from "../lib/video-content-types";
-import {
-  groupMachineVideosByRelease,
-  nextMachineReleaseTabAfterContentTypeChange,
-  type MachineReleaseTabId,
-} from "../lib/machine-video-tabs";
 
-type SortMode = "newest" | "views";
+type SortMode = "rising" | "newest" | "views";
 
 function MachinePage() {
   const { id } = useParams<{ id: string }>();
   const [location, setLocation] = useLocation();
-  const [, startTransition] = useTransition();
-  const [path] = location.split("?");
-  const contentType = parseVideoContentType(new URLSearchParams(queryStringFromLocation(location)).get("contentType"));
-  const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [visibleCount, setVisibleCount] = useState(20);
-  const [activeTab, setActiveTab] = useState<MachineReleaseTabId>("postRelease7");
-  const syncedContentTypeRef = useRef<VideoContentTypeValue | null>(null);
+  const params = new URLSearchParams(location.split("?")[1] ?? "");
+  const contentType = parseVideoContentType(params.get("contentType"));
+  const sort = parseSort(params.get("sort"));
 
   const detail = useQuery({
-    queryKey: ["machine", id, contentType],
-    queryFn: async () => (await api.machines[":id"].$get({ param: { id }, query: machineDetailQueryParams(contentType) })).json(),
+    queryKey: ["machine", id, contentType, sort],
+    queryFn: async () => (await api.machines[":id"].$get(({
+      param: { id },
+      query: machineDetailQueryParams(contentType, sort),
+    } as never))).json(),
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(queryStringFromLocation(location));
-    const rawContentType = params.get("contentType");
-    if (rawContentType && rawContentType !== contentType) {
-      params.set("contentType", contentType);
-      params.delete("cursor");
-      setLocation(`${path || `/machines/${id}`}?${params.toString()}`, { replace: true });
-    }
-  }, [contentType, id, location, path, setLocation]);
+  useEffect(() => setVisibleCount(20), [contentType, sort]);
 
-  const updateContentType = (nextContentType: VideoContentTypeValue) => {
-    startTransition(() => {
-      const params = updateContentTypeSearchParams(queryStringFromLocation(location), nextContentType, { resetCursor: true });
-      setVisibleCount(20);
-      setLocation(`${path || `/machines/${id}`}?${params.toString()}`);
-    });
+  const updateParams = (next: { contentType?: VideoContentTypeValue; sort?: SortMode }) => {
+    const nextParams = new URLSearchParams(location.split("?")[1] ?? "");
+    nextParams.set("contentType", next.contentType ?? contentType);
+    nextParams.set("sort", next.sort ?? sort);
+    setLocation(`/machines/${id}?${nextParams.toString()}`);
   };
 
-  const mentions = useMemo(() => {
-    if (!detail.data || "error" in detail.data) return [];
-    const sorted = [...detail.data.mentions];
-    sorted.sort((a, b) => {
-      if (sortMode === "views") return b.viewCount - a.viewCount || compareDateDesc(a.publishedAt, b.publishedAt);
-      return compareDateDesc(a.publishedAt, b.publishedAt) || b.viewCount - a.viewCount;
-    });
-    return sorted;
-  }, [detail.data, sortMode]);
-
-  const groups = useMemo(() => {
-    if (!detail.data || "error" in detail.data) {
-      return { preRelease: [], postRelease7: [], postReleaseAfter: [], unclassified: [] };
-    }
-    return groupMachineVideosByRelease(mentions, detail.data.machine.releaseDate);
-  }, [mentions, detail.data]);
-
-  const tabs = useMemo(() => [
-    { id: "postRelease7", label: "導入後7日以内", count: groups.postRelease7.length, data: groups.postRelease7 },
-    { id: "postReleaseAfter", label: "導入8日目以降", count: groups.postReleaseAfter.length, data: groups.postReleaseAfter },
-    { id: "preRelease", label: "導入前", count: groups.preRelease.length, data: groups.preRelease },
-    { id: "unclassified", label: "分類不能", count: groups.unclassified.length, data: groups.unclassified },
-  ] as const, [groups]);
-
-  useEffect(() => {
-    if (detail.isLoading || !detail.data || "error" in detail.data) return;
-    const didContentTypeChange = syncedContentTypeRef.current !== contentType;
-    const nextTab = nextMachineReleaseTabAfterContentTypeChange(tabs, activeTab, didContentTypeChange);
-    if (nextTab !== activeTab) setActiveTab(nextTab);
-    if (didContentTypeChange) {
-      setVisibleCount(20);
-      syncedContentTypeRef.current = contentType;
-    }
-  }, [activeTab, contentType, detail.data, detail.isLoading, tabs]);
-
-  if (detail.isLoading) {
-    return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
-  }
-
+  if (detail.isLoading) return <div className="animate-pulse h-64 rounded-xl border surface-card" />;
   if (detail.isError || !detail.data || "error" in detail.data) {
-    return <div className="text-center py-16 text-muted-foreground">機種情報が見つかりませんでした。</div>;
+    return <div className="py-16 text-center text-muted-foreground">機種情報を読み込めませんでした。</div>;
   }
 
   const { machine, summary } = detail.data;
-  const contentTypeCounts = detail.data.contentTypeCounts;
-  const activeGroupVideos = tabs.find(t => t.id === activeTab)?.data || [];
-  const visibleMentions = activeGroupVideos.slice(0, visibleCount);
+  const mentions = detail.data.mentions;
+  const contentTypeCounts: Partial<Record<VideoContentTypeValue, number>> = "contentTypeCounts" in detail.data ? detail.data.contentTypeCounts : {};
+  const visibleMentions = mentions.slice(0, visibleCount);
+  const isRisingEmpty = sort === "rising" && mentions.length === 0 && summary.rankingVideoCount > 0;
 
   return (
     <div>
-      <Link to="/machines" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
+      <Link to="/machines" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" />
-        新台バズランキングに戻る
+        機種一覧に戻る
       </Link>
 
-      <section className="site-hero rounded-2xl px-5 py-6 mb-6 sm:px-7">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+      <section className="site-hero mb-6 rounded-2xl px-5 py-6 sm:px-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <h1 className="font-display font-extrabold text-3xl mb-3">{machine.name}</h1>
+            <h1 className="mb-3 break-words font-display text-3xl font-extrabold">{machine.name}</h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Factory className="size-4" />
-                {machine.maker ?? "メーカー未設定"}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Film className="size-4" />
-                {machine.type === "pachinko" ? "パチンコ" : machine.type === "slot" ? "パチスロ" : "種別未設定"}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="size-4" />
-                {machine.releaseDate ? `${formatDate(machine.releaseDate)} 導入` : "導入日未設定"}
-              </span>
-              {machine.officialUrl && (
-                <a
-                  href={machine.officialUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-info hover:text-info/80 font-semibold"
-                >
-                  <ExternalLink className="size-4" />
-                  公式サイト
-                </a>
-              )}
+              <span className="inline-flex items-center gap-1.5"><Factory className="size-4" />{machine.maker ?? "メーカー未設定"}</span>
+              <span className="inline-flex items-center gap-1.5"><Film className="size-4" />{machine.type === "pachinko" ? "パチンコ" : machine.type === "slot" ? "パチスロ" : "種別未設定"}</span>
+              <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" />{machine.releaseDate ? `${formatDate(machine.releaseDate)} 導入` : "導入日未設定"}</span>
+              {machine.officialUrl && <a href={machine.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-info hover:text-info/80"><ExternalLink className="size-4" />公式サイト</a>}
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              集計期間: {summary.periodStart && summary.periodEnd ? `${formatDate(summary.periodStart)} - ${formatDate(summary.periodEnd)}` : "データ蓄積中"}
-            </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:min-w-60">
-            <div className="rounded-xl border surface-card p-4">
-              <p className="text-xs text-muted-foreground mb-1">関連動画</p>
-              <p className="font-display font-bold text-2xl">{summary.videoCount.toLocaleString("ja-JP")}</p>
-            </div>
-            <div className="rounded-xl border surface-card p-4">
-              <p className="text-xs text-muted-foreground mb-1">合計再生数</p>
-              <p className="font-display font-bold text-2xl">{summary.totalViews.toLocaleString("ja-JP")}</p>
-            </div>
+          <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 lg:w-auto">
+            <Stat icon={<Video className="size-3.5" />} label="関連動画" value={summary.videoCount} hint="すべての動画種別" />
+            <Stat icon={<CalendarDays className="size-3.5" />} label="直近7日の新着" value={summary.recentVideoCount} hint="公開日基準" />
+            <Stat icon={<TrendingUp className="size-3.5" />} label="7日間の再生増加" value={summary.recentViews} hint="履歴比較" />
+            <Stat icon={<Eye className="size-3.5" />} label="ランキング対象" value={summary.rankingVideoCount} hint="通常動画・ショート・ライブ" />
           </div>
         </div>
+        <p className="mt-4 text-xs text-muted-foreground">最終更新: {formatDateTime(summary.lastUpdatedAt)}</p>
+        <p className="mt-2 text-sm text-muted-foreground">集計期間: {summary.periodStart && summary.periodEnd ? `${formatDate(summary.periodStart)} - ${formatDate(summary.periodEnd)}` : "データ蓄積中"}</p>
       </section>
 
-      <div className="mb-6">
-        <MachineVoteWidget machineId={machine.id} />
-      </div>
+      <div className="mb-6"><MachineVoteWidget machineId={machine.id} /></div>
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display font-semibold text-lg">関連動画一覧</h2>
+          <div>
+            <h2 className="font-display text-lg font-semibold">関連動画一覧</h2>
+            <p className="mt-1 text-xs text-muted-foreground">関連動画は確定済みのすべての動画種別。ランキング対象は通常動画・ショート・ライブで、広告・分類不明の動画は除外します。</p>
+          </div>
           <div className="segmented-control flex gap-1 rounded-lg border p-1">
-            <button
-              onClick={() => setSortMode("newest")}
-              className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
-                sortMode === "newest" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              新着順
-            </button>
-            <button
-              onClick={() => setSortMode("views")}
-              className={`segmented-button px-3 py-1.5 rounded-md text-sm font-semibold ${
-                sortMode === "views" ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              再生数順
-            </button>
+            {(["rising", "newest", "views"] as const).map((mode) => (
+              <button key={mode} onClick={() => updateParams({ sort: mode })} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${sort === mode ? "segmented-button-active bg-info/20 text-info" : "text-muted-foreground hover:text-foreground"}`}>
+                {mode === "rising" ? "急上昇" : mode === "newest" ? "新着" : "再生数"}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div
-          className="mb-5 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
-        >
+        <div className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-border pb-px no-scrollbar">
           {VIDEO_CONTENT_TYPE_TABS.map((tab) => {
-            const isActive = contentType === tab.value;
-            const count = contentTypeCounts?.[tab.value];
-            const isZero = count === 0;
-
-            return (
-              <button
-                key={tab.value}
-                aria-pressed={isActive}
-                onClick={() => updateContentType(tab.value)}
-                className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:border-gold rounded-t-md ${
-                  isActive
-                    ? "border-gold text-gold opacity-100"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
-              >
-                {tab.label}
-                {count !== undefined && (
-                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
-                    isActive
-                      ? "bg-gold/15 text-gold"
-                      : "bg-secondary text-muted-foreground"
-                  } ${isZero ? "opacity-60" : ""}`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
+            const count = contentTypeCounts?.[tab.value] ?? 0;
+            return <button key={tab.value} onClick={() => updateParams({ contentType: tab.value })} className={`shrink-0 rounded-t-md border-b-2 px-3 py-2 text-sm font-semibold ${contentType === tab.value ? "border-gold text-gold" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{tab.label}<span className="ml-1.5 text-xs">{count}</span></button>;
           })}
         </div>
 
-        {/* Category Tabs */}
-        {mentions.length > 0 && (
-          <div
-            className="mb-6 flex gap-2 border-b border-border pb-px overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth"
-          >
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              const count = tab.count;
-              const isZero = count === 0;
-
-              return (
-                <button
-                  key={tab.id}
-                  aria-pressed={isActive}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setVisibleCount(20);
-                  }}
-                  className={`pb-3.5 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-info/60 focus-visible:border-info rounded-t-md ${
-                    isActive
-                      ? "border-info text-info opacity-100"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  } ${isZero && !isActive ? "opacity-45 hover:opacity-80" : ""}`}
-                >
-                  {tab.label}
-                  <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-display font-bold transition-colors ${
-                    isActive
-                      ? "bg-info/15 text-info"
-                      : "bg-secondary text-muted-foreground"
-                  } ${isZero ? "opacity-60" : ""}`}>
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {mentions.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground">
-            <SearchX className="mx-auto mb-3 size-8 text-info" />
-            <p className="font-semibold text-foreground">まだ関連動画が見つかっていません。</p>
-            <p className="mt-2 text-sm">日次収集で該当動画が見つかると、ここに一覧表示されます。</p>
-          </div>
-        ) : activeGroupVideos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground">
-            <SearchX className="mx-auto mb-3 size-8 text-info" />
-            <p className="font-semibold text-foreground">この分類には動画がありません。</p>
-          </div>
+          <MachineEmptyState contentType={contentType} rising={isRisingEmpty} />
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
-              {visibleMentions.map((mention) => (
-                <VideoCard
-                  key={mention.videoId}
-                  videoId={mention.videoId}
-                  title={mention.videoTitle}
-                  thumbnailUrl={null}
-                  publishedAt={mention.publishedAt}
-                  viewCount={mention.viewCount}
-                  channelName={mention.channelName}
-                  channelThumbnailUrl={mention.channelThumbnailUrl}
-                  contentType={mention.contentType}
-                />
-              ))}
+            {visibleMentions.map((video) => <VideoCard key={video.videoId} videoId={video.videoId} title={video.videoTitle} thumbnailUrl={null} publishedAt={video.publishedAt} viewCount={video.viewCount} channelName={video.channelName} channelThumbnailUrl={video.channelThumbnailUrl} contentType={video.contentType} machineTags={video.machineTags} metric={sort === "rising" ? formatTrend(video) : undefined} />)}
             </div>
-            {visibleCount < activeGroupVideos.length && (
-              <div className="mt-6 text-center">
-                <button
-                  onClick={() => setVisibleCount((count) => count + 20)}
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:border-info/60 hover:text-info"
-                >
-                  もっと見る
-                </button>
-              </div>
-            )}
+            {visibleCount < mentions.length && <div className="mt-6 text-center"><button onClick={() => setVisibleCount((count) => count + 20)} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:border-info/60 hover:text-info">もっと見る</button></div>}
           </>
         )}
       </section>
@@ -299,21 +119,18 @@ function MachinePage() {
   );
 }
 
-function compareDateDesc(a: string | null, b: string | null) {
-  return Date.parse(b ?? "") - Date.parse(a ?? "");
+function Stat({ icon, label, value, hint }: { icon: ReactNode; label: string; value: number; hint: string }) {
+  return <div className="rounded-xl border surface-card p-3"><p className="flex items-center gap-1 text-[11px] text-muted-foreground">{icon}{label}</p><p className="mt-1 font-display text-xl font-bold">{value.toLocaleString("ja-JP")}</p><p className="text-[10px] text-muted-foreground">{hint}</p></div>;
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" }).format(date);
+function MachineEmptyState({ contentType, rising }: { contentType: VideoContentTypeValue; rising: boolean }) {
+  const message = rising ? "急上昇の計算には、日付の異なる再生履歴が2件以上必要です。" : `この機種に紐付いた確定済みの${videoContentTypeLabel(contentType)}はありません。`;
+  return <div className="rounded-xl border border-dashed border-border surface-card px-5 py-12 text-center text-muted-foreground"><SearchX className="mx-auto mb-3 size-8 text-info" /><p className="font-semibold text-foreground">表示できる動画がありません</p><p className="mt-2 text-sm">{message}</p></div>;
 }
 
-function queryStringFromLocation(location: string) {
-  const queryStart = location.indexOf("?");
-  if (queryStart >= 0) return location.slice(queryStart);
-  return typeof window === "undefined" ? "" : window.location.search;
-}
+function parseSort(value: string | null): SortMode { return value === "newest" || value === "views" ? value : "rising"; }
+function formatTrend(video: { hasTrend: boolean; viewDelta: number }) { return video.hasTrend ? `+${video.viewDelta.toLocaleString("ja-JP")}再生 / 7日` : "履歴不足"; }
+function formatDate(value: string | null | undefined) { if (!value) return "導入日未設定"; const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" }).format(date); }
+function formatDateTime(value: string | Date | null | undefined) { if (!value) return "更新日時未設定"; const date = new Date(value); return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(date); }
 
 export default MachinePage;

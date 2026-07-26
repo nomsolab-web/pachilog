@@ -120,6 +120,7 @@ function VideosTrendingPage() {
                   channelName={video.channelName}
                   channelThumbnailUrl={video.channelThumbnailUrl}
                   contentType={video.contentType}
+                  machineTags={video.machineTags}
                   metric={videoTrendMetricLabel(video)}
                 />
               </div>

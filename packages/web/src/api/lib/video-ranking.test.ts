@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  calculateVideoTrend,
   decodeVideoRankingCursor,
   encodeVideoRankingCursor,
   paginateVideoRanking,
@@ -47,5 +48,18 @@ describe("video ranking pagination", () => {
     expect(first.page.map((entry) => entry.videoId)).toEqual(["a", "c"]);
     expect(second.page.map((entry) => entry.videoId)).toEqual(["b", "d"]);
     expect(second.page.some((entry) => entry.videoId === "new-top")).toBe(false);
+  });
+});
+
+describe("video trend calculation", () => {
+  test("uses the same seven-day comparison as the global ranking", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 180 },
+      { date: "2026-07-10", viewCount: 100 },
+    ], 7)).toMatchObject({ hasTrend: true, viewDelta: 80, comparisonStatus: "ready" });
+  });
+
+  test("reports insufficient history without inventing a trend", () => {
+    expect(calculateVideoTrend([{ date: "2026-07-17", viewCount: 180 }], 7)).toMatchObject({ hasTrend: false, viewDelta: 0, comparisonStatus: "insufficient" });
   });
 });

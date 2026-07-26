@@ -1,11 +1,11 @@
 import { Hono } from "hono";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../database";
-import { channels, videos, videoSnapshots } from "../database/schema";
-import { isVideoContentType, type VideoContentType } from "../lib/content-type";
+import { channels, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
+import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { clampLimit } from "../lib/pagination";
-import { selectComparisonSnapshots } from "../lib/ranking";
-import { decodeVideoRankingCursor, paginateVideoRanking, sortVideoRankingEntries } from "../lib/video-ranking";
+import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, selectConfirmedMachineVideos } from "../lib/machine-content";
+import { calculateVideoTrend, decodeVideoRankingCursor, paginateVideoRanking, sortVideoRankingEntries } from "../lib/video-ranking";
 
 const MODES = new Set(["previous", "7d"]);
 const MAX_LIMIT = 100;
@@ -40,6 +40,20 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
     .orderBy(desc(videos.viewCount));
 
   const videoIds = videoRows.map((video) => video.videoId);
+  const machineTagRows = videoIds.length > 0
+    ? await db
+        .select({ videoId: videoMachineLinks.videoId, machineId: machines.id, machineName: machines.name, matchStatus: videos.matchStatus, matchMethod: videoMachineLinks.matchMethod, contentType: videos.contentType })
+        .from(videoMachineLinks)
+        .innerJoin(machines, eq(videoMachineLinks.machineId, machines.id))
+        .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
+        .where(and(inArray(videoMachineLinks.videoId, videoIds), eq(videos.matchStatus, CONFIRMED_MATCH_STATUS), ne(videoMachineLinks.matchMethod, EXCLUDED_MACHINE_LINK_METHOD)))
+    : [];
+  const machineTagsByVideoId = new Map<string, { id: number; name: string }[]>();
+  for (const row of selectConfirmedMachineVideos(machineTagRows)) {
+    const tags = machineTagsByVideoId.get(row.videoId) ?? [];
+    if (!tags.some((tag) => tag.id === row.machineId)) tags.push({ id: row.machineId, name: row.machineName });
+    machineTagsByVideoId.set(row.videoId, tags);
+  }
   const snapshotRows =
     videoIds.length > 0
       ? await db
@@ -57,35 +71,14 @@ export const videosRoute = new Hono().get("/trending", async (c) => {
 
   const entries = videoRows.map((video) => {
       const snapshots = snapshotsByVideoId.get(video.videoId) ?? [];
-      const comparable = snapshots.map((snapshot) => ({
-        date: snapshot.date,
-        subscriberCount: snapshot.viewCount,
-        row: snapshot,
-      }));
-      const comparison = selectComparisonSnapshots(comparable, period);
-      const latest = comparison.latest?.row ?? null;
-      const base = comparison.base?.row ?? null;
-      const snapshotDays = snapshots.length;
-      const hasTrend = !!latest && !!base && comparison.status === "ready";
-      const viewDelta = hasTrend ? latest.viewCount - base.viewCount : 0;
-      const viewDeltaPct = hasTrend && base.viewCount > 0 ? (viewDelta / base.viewCount) * 100 : 0;
-
       return {
         ...video,
-        latestDate: latest?.date ?? null,
-        baseDate: hasTrend ? base?.date ?? null : null,
-        snapshotDays,
-        comparisonStatus: comparison.status,
-        comparisonStartDate: comparison.comparisonStartDate,
-        comparisonEndDate: comparison.comparisonEndDate,
-        isProvisional: false,
-        hasTrend,
-        viewDelta,
-        viewDeltaPct: Number(viewDeltaPct.toFixed(2)),
+        machineTags: machineTagsByVideoId.get(video.videoId) ?? [],
+        ...calculateVideoTrend(snapshots, period),
       };
     });
 
-  const ranked = sortVideoRankingEntries(entries.filter((entry) => entry.viewDelta > 0));
+  const ranked = sortVideoRankingEntries(entries.filter((entry) => entry.viewDelta > 0 && isRankableVideoContentType(entry.contentType)));
   const page = paginateVideoRanking(ranked, limit, cursor);
   const counts = await contentTypeCounts();
   return c.json(

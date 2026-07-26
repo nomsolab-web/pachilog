@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { classifyVideoContent } from "./content-type";
+import { classifyVideoContent, isRankableVideoContentType } from "./content-type";
 
 describe("video content type classification", () => {
+  test("excludes promotion and unknown from the normal ranking pool", () => {
+    expect(isRankableVideoContentType("standard")).toBe(true);
+    expect(isRankableVideoContentType("short")).toBe(true);
+    expect(isRankableVideoContentType("live")).toBe(true);
+    expect(isRankableVideoContentType("promotion")).toBe(false);
+    expect(isRankableVideoContentType("unknown")).toBe(false);
+  });
   test("prioritizes official WebCM over shorts signals", () => {
     expect(classifyVideoContent({ title: "\u3010WebCM\u3011L\u8056\u95d8\u58eb\u9ec4\u91d1\u5341\u4e8c\u5bae #shorts", durationSeconds: 15, channelCategory: "manufacturer" }).contentType).toBe("promotion");
   });

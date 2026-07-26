@@ -1,13 +1,27 @@
-import type { VideoContentType } from "./content-type";
+import { isRankableVideoContentType, type VideoContentType } from "./content-type";
 
 export type MachineLinkedVideo = {
   videoId: string;
   matchMethod: string;
   contentType: VideoContentType;
+  matchStatus?: string | null;
 };
 
+export const CONFIRMED_MATCH_STATUS = "matched" as const;
+export const EXCLUDED_MACHINE_LINK_METHOD = "manual_excluded" as const;
+
+export function isConfirmedMachineLink(row: Pick<MachineLinkedVideo, "matchMethod" | "matchStatus">) {
+  return row.matchStatus === CONFIRMED_MATCH_STATUS && row.matchMethod !== EXCLUDED_MACHINE_LINK_METHOD;
+}
+
 export function excludeManualExcludedLinks<T extends MachineLinkedVideo>(rows: readonly T[]) {
-  return rows.filter((row) => row.matchMethod !== "manual_excluded");
+  return rows.filter(isConfirmedMachineLink);
+}
+
+export const selectConfirmedMachineVideos = excludeManualExcludedLinks;
+
+export function selectRankableMachineVideos<T extends MachineLinkedVideo>(rows: readonly T[]) {
+  return selectConfirmedMachineVideos(rows).filter((row) => isRankableVideoContentType(row.contentType));
 }
 
 export function countMachineContentTypes(rows: readonly { contentType: VideoContentType }[]) {

@@ -2,6 +2,11 @@ import type { ChannelCategory } from "../data/seed-channels";
 
 export const VIDEO_CONTENT_TYPES = ["standard", "short", "live", "promotion", "unknown"] as const;
 export type VideoContentType = (typeof VIDEO_CONTENT_TYPES)[number];
+export const RANKABLE_VIDEO_CONTENT_TYPES = ["standard", "short", "live"] as const;
+
+export function isRankableVideoContentType(value: VideoContentType) {
+  return (RANKABLE_VIDEO_CONTENT_TYPES as readonly string[]).includes(value);
+}
 
 export type YoutubeLiveStreamingDetails = {
   actualStartTime?: string | null;
