@@ -5,11 +5,20 @@ type SnapshotLike = {
 
 export type ComparisonStatus = "ready" | "insufficient";
 
-function getMinPeriodDays(period: number): number {
-  if (period <= 1) return 1;
-  if (period <= 7) return 2;
-  if (period <= 30) return 7;
-  return 14;
+function isComparisonDaysAllowed(period: number, comparisonDays: number): boolean {
+  if (period === 1) {
+    return comparisonDays >= 1 && comparisonDays <= 3;
+  }
+  if (period === 7) {
+    return comparisonDays >= 5 && comparisonDays <= 9;
+  }
+  if (period === 30) {
+    return comparisonDays >= 21 && comparisonDays <= 39;
+  }
+  if (period === 90) {
+    return comparisonDays >= 60 && comparisonDays <= 120;
+  }
+  return false;
 }
 
 function dateDiffAbs(d1: string, d2: string): number {
@@ -38,6 +47,9 @@ export function selectComparisonSnapshots<T extends SnapshotLike>(
     let minDiff = Infinity;
     for (const snapshot of ordered) {
       if (snapshot.date === latest.date) continue;
+      // Requirement 4: exclude future baselines relative to latest date
+      if (snapshot.date >= latest.date) continue;
+
       const diff = dateDiffAbs(snapshot.date, targetDate);
       if (diff < minDiff) {
         minDiff = diff;
@@ -50,18 +62,27 @@ export function selectComparisonSnapshots<T extends SnapshotLike>(
     }
   }
 
-  const comparisonDays = latest && base ? daysBetween(base.date, latest.date) : 0;
-  const minPeriodDays = getMinPeriodDays(period);
-  const hasEnoughData = latest && base && comparisonDays >= minPeriodDays;
+  // Requirement 6: subscriberCount must not be null/undefined
+  const isSubscriberCountValid = (snapshot: T | null): boolean => {
+    if (!snapshot) return false;
+    return snapshot.subscriberCount !== null && snapshot.subscriberCount !== undefined;
+  };
+
+  const hasValidSubscribers = isSubscriberCountValid(latest) && isSubscriberCountValid(base);
+
+  const rawComparisonDays = latest && base ? daysBetween(base.date, latest.date) : 0;
+  const hasEnoughData = latest && base && hasValidSubscribers && isComparisonDaysAllowed(period, rawComparisonDays);
+
+  const comparisonDays = hasEnoughData ? rawComparisonDays : 0;
 
   return {
     latest: hasEnoughData ? latest : null,
     base: hasEnoughData ? base : null,
-    comparisonDays: hasEnoughData ? comparisonDays : 0,
+    comparisonDays,
     comparisonStartDate: hasEnoughData ? base.date : null,
     comparisonEndDate: hasEnoughData ? latest.date : null,
     status: hasEnoughData ? ("ready" as ComparisonStatus) : ("insufficient" as ComparisonStatus),
-    isProvisional: hasEnoughData && comparisonDays < period,
+    isProvisional: hasEnoughData && comparisonDays !== period,
   };
 }
 
