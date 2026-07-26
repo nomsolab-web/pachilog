@@ -11,6 +11,7 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
   const {
     data,
     yDomain,
+    ticks,
     latestSubscriberCount,
     isPublic,
     delta,
@@ -30,13 +31,25 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
   const deltaSign = delta > 0 ? "+" : "";
   const pctSign = deltaPct > 0 ? "+" : "";
 
+  // Consistent tick formatting logic
+  const maxAbsTick = Math.max(...ticks.map(Math.abs));
+  const useManUnit = maxAbsTick >= 10000;
+
   const formatYAxisTick = (val: number) => {
+    if (val === 0) return "0";
+    const sign = val < 0 ? "-" : (isSubscribers ? "+" : "");
     const absVal = Math.abs(val);
-    const sign = val < 0 ? "-" : val > 0 ? "+" : "";
-    if (absVal >= 10000) {
-      return `${sign}${(absVal / 10000).toFixed(1)}万`;
+
+    if (useManUnit) {
+      const manVal = absVal / 10000;
+      if (Number.isInteger(manVal)) {
+        return `${sign}${manVal}万`;
+      } else {
+        return `${sign}${manVal.toFixed(1)}万`;
+      }
+    } else {
+      return `${sign}${absVal.toLocaleString("ja-JP")}`;
     }
-    return `${sign}${absVal.toLocaleString("ja-JP")}`;
   };
 
   return (
@@ -86,6 +99,7 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
               axisLine={false}
               width={56}
               domain={yDomain}
+              ticks={ticks}
               tickFormatter={formatYAxisTick}
             />
             <Tooltip
@@ -129,7 +143,7 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
                 return null;
               }}
             />
-            <Area type="monotone" dataKey="value" stroke="var(--accent-blue)" strokeWidth={2} fill="url(#chartFill)" />
+            <Area type="stepAfter" dataKey="value" stroke="var(--accent-blue)" strokeWidth={2} fill="url(#chartFill)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

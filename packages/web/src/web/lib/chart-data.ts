@@ -11,12 +11,84 @@ export type ChartDataPoint = {
   dayDiff: number;
 };
 
+export function calculateYAxisTicks(
+  minVal: number,
+  maxVal: number
+): { ticks: number[]; domain: [number, number] } {
+  // If no change, return a simple set of ticks around the value
+  if (minVal === maxVal) {
+    const val = minVal;
+    if (val >= 0) {
+      return {
+        ticks: [0, 50, 100, 150, 200],
+        domain: [-30, 230],
+      };
+    } else {
+      return {
+        ticks: [val - 100, val - 50, val, val + 50, val + 100],
+        domain: [val - 130, val + 130],
+      };
+    }
+  }
+
+  // Calculate raw range
+  const range = maxVal - minVal;
+
+  // Choose target number of tick marks (e.g., 4 to 6)
+  const targetTicks = 5;
+  const rawStep = range / (targetTicks - 1);
+
+  // Get magnitude (power of 10)
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalizedStep = rawStep / magnitude;
+
+  // Round normalizedStep to 1, 2, 5, or 10
+  let step: number;
+  if (normalizedStep < 1.5) {
+    step = 1 * magnitude;
+  } else if (normalizedStep < 3) {
+    step = 2 * magnitude;
+  } else if (normalizedStep < 7) {
+    step = 5 * magnitude;
+  } else {
+    step = 10 * magnitude;
+  }
+
+  // Ensure step is at least 1 for small integers
+  step = Math.max(1, step);
+
+  // Generate ticks that span the data range
+  // Round start tick down to a multiple of step
+  let startTick = Math.floor(minVal / step) * step;
+  const endTick = Math.ceil(maxVal / step) * step;
+
+  // Clamp startTick to 0 if all values are >= 0
+  if (minVal >= 0 && startTick < 0) {
+    startTick = 0;
+  }
+
+  const ticks: number[] = [];
+  for (let t = startTick; t <= endTick; t += step) {
+    ticks.push(t);
+  }
+
+  // Add 15% padding to domain beyond the extreme ticks
+  const domainMin = startTick - step * 0.15;
+  const domainMax = endTick + step * 0.15;
+
+  return {
+    ticks,
+    domain: [domainMin, domainMax],
+  };
+}
+
 export function prepareChartData(
   snapshots: Snapshot[],
   metric: "subscriberCount" | "viewCount"
 ): {
   data: ChartDataPoint[];
   yDomain: [number, number];
+  ticks: number[];
   latestSubscriberCount: number;
   periodStartSubscriberCount: number;
   isPublic: boolean;
@@ -50,6 +122,7 @@ export function prepareChartData(
     return {
       data: [],
       yDomain: [0, 100],
+      ticks: [0, 25, 50, 75, 100],
       latestSubscriberCount: 0,
       periodStartSubscriberCount: 0,
       isPublic: false,
@@ -95,20 +168,14 @@ export function prepareChartData(
     };
   });
 
-  // 5. Calculate Y-axis domain with 15% padding
+  // 5. Calculate Y-axis ticks and domain
   const values = data.map((d) => d.value);
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
-  const range = maxVal - minVal;
 
-  let yDomain: [number, number];
-  if (range === 0) {
-    yDomain = [minVal - 100, maxVal + 100];
-  } else {
-    const padding = range * 0.15;
-    yDomain = [Math.floor(minVal - padding), Math.ceil(maxVal + padding)];
-  }
+  const { ticks, domain: yDomain } = calculateYAxisTicks(minVal, maxVal);
 
+  // 6. Calculate periodDays
   let periodDays = 0;
   if (firstSnapshot && latestSnapshot && firstSnapshot.date && latestSnapshot.date) {
     const firstDate = new Date(firstSnapshot.date);
@@ -122,6 +189,7 @@ export function prepareChartData(
   return {
     data,
     yDomain,
+    ticks,
     latestSubscriberCount,
     periodStartSubscriberCount,
     isPublic,
