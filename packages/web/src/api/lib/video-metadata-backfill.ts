@@ -6,6 +6,7 @@ export type BackfillVideoRow = {
   durationSeconds: number | null;
   liveBroadcastContent: string | null;
   channelCategory?: Parameters<typeof classifyVideoContent>[0]["channelCategory"];
+  contentType?: Parameters<typeof classifyVideoContent>[0]["existingContentType"];
 };
 
 export type BackfillVideoMetadata = {
@@ -55,6 +56,7 @@ export function buildVideoMetadataBackfillUpdates(
         title: video.title,
         durationSeconds: video.durationSeconds,
         liveBroadcastContent: video.liveBroadcastContent,
+        existingContentType: video.contentType,
         channelCategory: video.channelCategory,
       });
       updates.push({
@@ -76,6 +78,7 @@ export function buildVideoMetadataBackfillUpdates(
       durationSeconds: metadata.durationSeconds,
       liveBroadcastContent: metadata.liveBroadcastContent,
       liveStreamingDetails: metadata.liveStreamingDetails,
+      existingContentType: video.contentType,
       channelCategory: video.channelCategory,
     });
     updates.push({

@@ -7,6 +7,7 @@ export type YoutubeLiveStreamingDetails = {
   actualStartTime?: string | null;
   actualEndTime?: string | null;
   scheduledStartTime?: string | null;
+  scheduledEndTime?: string | null;
 };
 
 export type VideoContentClassificationInput = {
@@ -15,6 +16,7 @@ export type VideoContentClassificationInput = {
   liveBroadcastContent?: string | null;
   liveStreamingDetails?: YoutubeLiveStreamingDetails | null;
   channelCategory?: ChannelCategory | null;
+  existingContentType?: VideoContentType | null;
 };
 
 export type VideoContentClassification = {
@@ -78,9 +80,8 @@ function liveReason(input: VideoContentClassificationInput) {
   if (LIVE_CLIP_OR_NON_LIVE_PATTERNS.some((pattern) => pattern.test(input.title))) return null;
   const liveBroadcastContent = input.liveBroadcastContent?.toLowerCase();
   const details = input.liveStreamingDetails;
-  if (details?.actualStartTime || details?.actualEndTime || details?.scheduledStartTime) return "youtube liveStreamingDetails present";
   if (liveBroadcastContent === "live" || liveBroadcastContent === "upcoming") return `youtube liveBroadcastContent=${liveBroadcastContent}`;
-  if (liveBroadcastContent === "completed") return "youtube liveBroadcastContent=completed";
+  if (input.existingContentType === "live") return "existing live classification retained because live metadata is inconclusive";
   return null;
 }
 
