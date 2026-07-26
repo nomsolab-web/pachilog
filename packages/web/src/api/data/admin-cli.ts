@@ -3,7 +3,7 @@
  * Run:
  *   bun packages/web/src/api/data/admin-cli.ts <command> [args]
  */
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../database";
 import {
   machineMentions,
@@ -11,7 +11,7 @@ import {
   videoMachineLinks,
   videos as videosTable,
 } from "../database/schema";
-import { findDetailedMachineMatches } from "../lib/machine-match";
+import { planMachineRematch, summarizeMachineRematch } from "../lib/machine-rematch";
 import * as readline from "node:readline";
 
 async function main() {
@@ -58,7 +58,7 @@ Commands:
   list-unmatched                        List all videos currently marked as unmatched.
   link <videoId> <machineId>            Manually link a video to a machine.
   exclude <videoId> <machineId>         Manually exclude a video from matching a machine.
-  rematch-all [--confirm] [--dry-run]   Clear auto-matches and rerun auto-matching on all videos.
+  rematch-all [--confirm] [--dry-run]   Add missing auto-matches without changing protected links.
 `);
 }
 
@@ -194,38 +194,31 @@ async function rematchAll(options: string[]) {
   // Fetch all machines
   const machineList = await db.select().from(machines);
 
-  // Fetch all videos NOT marked as manual/manual_excluded
-  const videosToProcess = await db
-    .select()
-    .from(videosTable)
-    .where(
-      notInArray(videosTable.matchStatus, ["manual", "manual_excluded"])
-    );
+  const videosToProcess = await db.select().from(videosTable);
 
   if (videosToProcess.length === 0) {
     console.log("No videos found to rematch.");
     return;
   }
 
-  // Count matches
-  let proposedMatchesCount = 0;
-  const matchDecisions: { video: typeof videosTable.$inferSelect; matches: any[] }[] = [];
-
-  for (const video of videosToProcess) {
-    const matches = findDetailedMachineMatches(video.title, machineList);
-    matchDecisions.push({ video, matches });
-    proposedMatchesCount += matches.length;
-  }
+  const existingLinks = await db.select().from(videoMachineLinks);
+  const matchDecisions = planMachineRematch(videosToProcess, machineList, existingLinks);
+  const summary = summarizeMachineRematch(videosToProcess, existingLinks, matchDecisions);
 
   if (isDryRun) {
     console.log("\n[DRY RUN] Rematch all simulation details:");
     console.log(`- Videos that would be processed: ${videosToProcess.length}`);
-    console.log(`- Auto-matched links that would be created: ${proposedMatchesCount}`);
+    console.log(`- Matched videos: ${summary.matched}`);
+    console.log(`- Ambiguous videos: ${summary.ambiguous}`);
+    console.log(`- Unmatched videos: ${summary.unmatched}`);
+    console.log(`- New links that would be created: ${summary.linksToAdd}`);
+    console.log(`- Manual exclusions preserved: ${summary.manualExcludedPreserved}`);
     console.log("\nSample matches:");
     const samples = matchDecisions.filter(d => d.matches.length > 0).slice(0, 5);
     for (const sample of samples) {
-      console.log(`  Video: "${sample.video.title}"`);
-      console.log(`  Matches: ${sample.matches.map(m => `Machine #${m.machineId} (${m.matchMethod})`).join(", ")}`);
+      const video = videosToProcess.find((item) => item.videoId === sample.videoId);
+      console.log(`  Video: "${video?.title ?? sample.videoId}"`);
+      console.log(`  Matches: ${sample.matches.map(m => "Machine #" + m.machineId + " (" + m.matchMethod + ")").join(", ")}`);
     }
     console.log("\n[DRY RUN] No database changes were made.");
     return;
@@ -241,31 +234,12 @@ async function rematchAll(options: string[]) {
     }
   }
 
-  console.log("Executing rematch-all...");
-
-  // 1. Delete all auto-matched links
-  await db
-    .delete(videoMachineLinks)
-    .where(
-      inArray(videoMachineLinks.matchMethod, ["exact_name", "alias"])
-    );
-
-  // 2. Perform insertions and update statuses
+  console.log("Executing rematch-all without deleting protected or existing links...");
   let insertCount = 0;
-  for (const { video, matches } of matchDecisions) {
-    // Keep manual links (exclusions)
-    const existingLinks = await db
-      .select()
-      .from(videoMachineLinks)
-      .where(eq(videoMachineLinks.videoId, video.videoId));
-
-    const manualLinks = existingLinks.filter(l => l.matchMethod === "manual" || l.matchMethod === "manual_excluded");
-    const manualMachineIds = new Set(manualLinks.map(l => l.machineId));
-
-    // Filter matches
-    const newLinks = matches.filter(m => !manualMachineIds.has(m.machineId));
-
-    for (const link of newLinks) {
+  for (const decision of matchDecisions) {
+    const video = videosToProcess.find((item) => item.videoId === decision.videoId);
+    if (!video) continue;
+    for (const link of decision.linksToAdd) {
       await db.insert(videoMachineLinks).values({
         videoId: video.videoId,
         machineId: link.machineId,
@@ -275,10 +249,7 @@ async function rematchAll(options: string[]) {
       insertCount++;
     }
 
-    const finalLinks = await db
-      .select()
-      .from(videoMachineLinks)
-      .where(eq(videoMachineLinks.videoId, video.videoId));
+    const finalLinks = await db.select().from(videoMachineLinks).where(eq(videoMachineLinks.videoId, video.videoId));
 
     const hasActiveMatches = finalLinks.some(l => l.matchMethod !== "manual_excluded");
     const status = hasActiveMatches ? "matched" : "unmatched";
