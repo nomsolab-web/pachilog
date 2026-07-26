@@ -1,9 +1,23 @@
 type SnapshotLike = {
   date: string;
-  subscriberCount: number;
+  subscriberCount: number | null | undefined;
 };
 
 export type ComparisonStatus = "ready" | "insufficient";
+
+function getMinPeriodDays(period: number): number {
+  if (period <= 1) return 1;
+  if (period <= 7) return 2;
+  if (period <= 30) return 7;
+  return 14;
+}
+
+function dateDiffAbs(d1: string, d2: string): number {
+  const t1 = new Date(`${d1}T00:00:00.000Z`).getTime();
+  const t2 = new Date(`${d2}T00:00:00.000Z`).getTime();
+  if (!Number.isFinite(t1) || !Number.isFinite(t2)) return Infinity;
+  return Math.round(Math.abs(t2 - t1) / 86_400_000);
+}
 
 export function selectComparisonSnapshots<T extends SnapshotLike>(
   snapshots: readonly T[],
@@ -18,21 +32,36 @@ export function selectComparisonSnapshots<T extends SnapshotLike>(
   const ordered = [...uniqueByDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   const latest = referenceDate ? ordered.find((snapshot) => snapshot.date <= referenceDate) ?? null : ordered[0] ?? null;
   const targetDate = latest ? shiftDate(latest.date, -period) : null;
-  const base = targetDate
-    ? ordered
-        .filter((snapshot) => snapshot.date <= targetDate)
-        .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
-    : null;
+
+  let base: T | null = null;
+  if (latest && targetDate) {
+    let minDiff = Infinity;
+    for (const snapshot of ordered) {
+      if (snapshot.date === latest.date) continue;
+      const diff = dateDiffAbs(snapshot.date, targetDate);
+      if (diff < minDiff) {
+        minDiff = diff;
+        base = snapshot;
+      } else if (diff === minDiff && base) {
+        if (snapshot.date < base.date) {
+          base = snapshot;
+        }
+      }
+    }
+  }
+
   const comparisonDays = latest && base ? daysBetween(base.date, latest.date) : 0;
+  const minPeriodDays = getMinPeriodDays(period);
+  const hasEnoughData = latest && base && comparisonDays >= minPeriodDays;
 
   return {
-    latest,
-    base,
-    comparisonDays,
-    comparisonStartDate: base?.date ?? null,
-    comparisonEndDate: latest?.date ?? null,
-    status: latest && base ? ("ready" as ComparisonStatus) : ("insufficient" as ComparisonStatus),
-    isProvisional: false,
+    latest: hasEnoughData ? latest : null,
+    base: hasEnoughData ? base : null,
+    comparisonDays: hasEnoughData ? comparisonDays : 0,
+    comparisonStartDate: hasEnoughData ? base.date : null,
+    comparisonEndDate: hasEnoughData ? latest.date : null,
+    status: hasEnoughData ? ("ready" as ComparisonStatus) : ("insufficient" as ComparisonStatus),
+    isProvisional: hasEnoughData && comparisonDays < period,
   };
 }
 

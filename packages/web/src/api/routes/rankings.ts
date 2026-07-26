@@ -84,5 +84,15 @@ export const rankings = new Hono().get("/", async (c) => {
       };
     });
 
-  return c.json({ period, rising, falling, insufficient, queryPlan: { activeChannels: 1, snapshots: 1 } }, 200);
+  return c.json(
+    {
+      period,
+      rising,
+      falling,
+      insufficient,
+      latestDate: snapshots[0]?.date ?? null,
+      queryPlan: { activeChannels: 1, snapshots: 1 },
+    },
+    200,
+  );
 });
