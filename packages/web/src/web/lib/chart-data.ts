@@ -22,6 +22,7 @@ export function prepareChartData(
   isPublic: boolean;
   delta: number;
   deltaPct: number;
+  periodDays: number;
 } {
   // 1. Deduplicate by date (keep latest duplicate) and sort chronologically
   const uniqueSnapshots = Array.from(
@@ -54,6 +55,7 @@ export function prepareChartData(
       isPublic: false,
       delta: 0,
       deltaPct: 0,
+      periodDays: 0,
     };
   }
 
@@ -107,6 +109,16 @@ export function prepareChartData(
     yDomain = [Math.floor(minVal - padding), Math.ceil(maxVal + padding)];
   }
 
+  let periodDays = 0;
+  if (firstSnapshot && latestSnapshot && firstSnapshot.date && latestSnapshot.date) {
+    const firstDate = new Date(firstSnapshot.date);
+    const lastDate = new Date(latestSnapshot.date);
+    if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime())) {
+      const diffTime = Math.abs(lastDate.getTime() - firstDate.getTime());
+      periodDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+  }
+
   return {
     data,
     yDomain,
@@ -115,5 +127,6 @@ export function prepareChartData(
     isPublic,
     delta,
     deltaPct,
+    periodDays,
   };
 }

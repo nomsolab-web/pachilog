@@ -140,4 +140,31 @@ describe("prepareChartData helper", () => {
     expect(result.periodStartSubscriberCount).toBe(10050);
     expect(result.latestSubscriberCount).toBe(10100);
   });
+
+  test("期間表示日数: calculates periodDays based on calendar days", () => {
+    // 2026-07-01 to 2026-07-07 represents 7 days
+    const snapshots1: Snapshot[] = [
+      { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
+      { date: "2026-07-07", subscriberCount: 10050, viewCount: 120 },
+    ];
+    const result1 = prepareChartData(snapshots1, "subscriberCount");
+    expect(result1.periodDays).toBe(7);
+
+    // With duplicate dates, it should still be 7 days
+    const snapshots2: Snapshot[] = [
+      { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
+      { date: "2026-07-01", subscriberCount: 10010, viewCount: 105 },
+      { date: "2026-07-07", subscriberCount: 10050, viewCount: 120 },
+    ];
+    const result2 = prepareChartData(snapshots2, "subscriberCount");
+    expect(result2.periodDays).toBe(7);
+
+    // With missing days, it calculates calendar-based difference (e.g. 01 to 05 is 5 days)
+    const snapshots3: Snapshot[] = [
+      { date: "2026-07-01", subscriberCount: 10000, viewCount: 100 },
+      { date: "2026-07-05", subscriberCount: 10050, viewCount: 120 },
+    ];
+    const result3 = prepareChartData(snapshots3, "subscriberCount");
+    expect(result3.periodDays).toBe(5);
+  });
 });

@@ -15,6 +15,7 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
     isPublic,
     delta,
     deltaPct,
+    periodDays,
   } = prepareChartData(snapshots, metric);
 
   if (data.length < 2) {
@@ -28,7 +29,6 @@ export function ChannelChart({ snapshots, metric }: { snapshots: Snapshot[]; met
   const isSubscribers = metric === "subscriberCount";
   const deltaSign = delta > 0 ? "+" : "";
   const pctSign = deltaPct > 0 ? "+" : "";
-  const periodDays = snapshots.length;
 
   const formatYAxisTick = (val: number) => {
     const absVal = Math.abs(val);
