@@ -8,8 +8,9 @@ import { VideoCard } from "../components/video-card";
 import {
   VIDEO_CONTENT_TYPE_TABS,
   machineDetailQueryParams,
-  parseVideoContentType,
   videoContentTypeLabel,
+  useSearch,
+  normalizeContentTypeSearchParams,
   type VideoContentTypeValue,
 } from "../lib/video-content-types";
 
@@ -18,10 +19,18 @@ type SortMode = "rising" | "newest" | "views";
 function MachinePage() {
   const { id } = useParams<{ id: string }>();
   const [location, setLocation] = useLocation();
+  const search = useSearch();
   const [visibleCount, setVisibleCount] = useState(20);
-  const params = new URLSearchParams(location.split("?")[1] ?? "");
-  const contentType = parseVideoContentType(params.get("contentType"));
+
+  const { contentType, params, shouldReplace } = normalizeContentTypeSearchParams(search);
   const sort = parseSort(params.get("sort"));
+  const [path] = location.split("?");
+
+  useEffect(() => {
+    if (shouldReplace) {
+      setLocation(`${path || `/machines/${id}`}?${params.toString()}`, { replace: true });
+    }
+  }, [shouldReplace, params, path, setLocation, id]);
 
   const detail = useQuery({
     queryKey: ["machine", id, contentType, sort],
@@ -34,9 +43,14 @@ function MachinePage() {
   useEffect(() => setVisibleCount(20), [contentType, sort]);
 
   const updateParams = (next: { contentType?: VideoContentTypeValue; sort?: SortMode }) => {
-    const nextParams = new URLSearchParams(location.split("?")[1] ?? "");
-    nextParams.set("contentType", next.contentType ?? contentType);
-    nextParams.set("sort", next.sort ?? sort);
+    const nextParams = new URLSearchParams(search);
+    if (next.contentType) {
+      nextParams.set("contentType", next.contentType);
+      nextParams.delete("cursor");
+    }
+    if (next.sort) {
+      nextParams.set("sort", next.sort);
+    }
     setLocation(`/machines/${id}?${nextParams.toString()}`);
   };
 
