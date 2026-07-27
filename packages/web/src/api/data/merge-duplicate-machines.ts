@@ -1,34 +1,38 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../database";
 import { machineMentions, machineVideoJudgments, machineVotes, machines, videoMachineLinks } from "../database/schema";
-import { normalizeMachineType } from "../../shared/machine-type";
-import { normalizeMachineName } from "../lib/machine-identity";
+import { machineIdentityKey } from "../lib/machine-identity";
 
 export const DUPLICATE_MACHINE_GROUPS = [
-  { canonicalId: 8, duplicateId: 5, label: "ベルセルク無双 第2章" },
-  { canonicalId: 6, duplicateId: 3, label: "デッドマウントデスプレイ" },
-  { canonicalId: 7, duplicateId: 4, label: "必殺仕事人VI" },
+  {
+    canonicalId: 8,
+    duplicateId: 5,
+    label: "ベルセルク無双 第2章",
+    canonical: { name: "デカスタeベルセルク無双 第2章 10連撃Ver.", maker: "ニューギン", type: "pachinko", releaseDate: "2026-07-21" },
+  },
+  {
+    canonicalId: 6,
+    duplicateId: 3,
+    label: "デッドマウントデスプレイ",
+    canonical: { name: "eフィーバー デッドマウント・デスプレイ 魂神9000", maker: "SANKYO", type: "pachinko", releaseDate: "2026-06-08" },
+  },
+  {
+    canonicalId: 7,
+    duplicateId: 4,
+    label: "必殺仕事人VI",
+    canonical: { name: "ぱちんこ 必殺仕事人VI", maker: "オッケー.", type: "pachinko", releaseDate: "2026-07-06" },
+  },
 ] as const;
 
 type MachineRecord = typeof machines.$inferSelect;
 type LinkRecord = typeof videoMachineLinks.$inferSelect;
 
-export function comparableDuplicateName(name: string, label: string) {
-  const normalized = normalizeMachineName(name);
-  return label === "デッドマウントデスプレイ" ? normalized.replace(/9000$/, "") : normalized;
-}
-
 export function validateDuplicateGroup(
   canonical: MachineRecord | undefined,
   duplicate: MachineRecord | undefined,
-  label: string,
 ) {
   if (!canonical || !duplicate) return { ok: false, reason: "machine row missing" };
-  if (canonical.releaseDate !== duplicate.releaseDate) return { ok: false, reason: "release date differs" };
-  if (normalizeMachineType(canonical.type) !== normalizeMachineType(duplicate.type)) return { ok: false, reason: "type differs" };
-  if (comparableDuplicateName(canonical.name, label) !== comparableDuplicateName(duplicate.name, label)) {
-    return { ok: false, reason: "normalized name differs" };
-  }
+  if (machineIdentityKey(canonical) !== machineIdentityKey(duplicate)) return { ok: false, reason: "machine identity differs" };
   if (canonical.series && duplicate.series && canonical.series !== duplicate.series) return { ok: false, reason: "series differs" };
   return { ok: true, reason: "same normalized machine identity" };
 }
@@ -41,10 +45,49 @@ const LINK_METHOD_PRIORITY: Record<string, number> = {
 };
 
 export function preferredLink(a: LinkRecord, b: LinkRecord) {
+  if (a.matchMethod === "manual_excluded" || b.matchMethod === "manual_excluded") {
+    return a.matchMethod === "manual_excluded" ? a : b;
+  }
   const aRank = LINK_METHOD_PRIORITY[a.matchMethod] ?? 0;
   const bRank = LINK_METHOD_PRIORITY[b.matchMethod] ?? 0;
   if (aRank !== bRank) return aRank > bRank ? a : b;
   return a.matchConfidence >= b.matchConfidence ? a : b;
+}
+
+function unionStrings(...values: Array<string[] | null | undefined>) {
+  return [...new Set(values.flatMap((value) => value ?? []))];
+}
+
+export function mergeMachineMetadataValues(
+  canonical: MachineRecord,
+  duplicate: MachineRecord,
+  group: (typeof DUPLICATE_MACHINE_GROUPS)[number],
+) {
+  const scalar = <T>(first: T | null | undefined, second: T | null | undefined) => first ?? second ?? null;
+  return {
+    name: group.canonical.name,
+    maker: group.canonical.maker,
+    type: group.canonical.type,
+    releaseDate: group.canonical.releaseDate,
+    shortName: scalar(canonical.shortName, duplicate.shortName),
+    series: scalar(canonical.series, duplicate.series),
+    thumbnailUrl: scalar(canonical.thumbnailUrl, duplicate.thumbnailUrl),
+    sourceUrl: scalar(canonical.sourceUrl, duplicate.sourceUrl),
+    officialUrl: scalar(canonical.officialUrl, duplicate.officialUrl),
+    aliases: unionStrings(canonical.aliases, duplicate.aliases),
+    uniqueAliases: unionStrings(canonical.uniqueAliases, duplicate.uniqueAliases),
+    ambiguousAliases: unionStrings(canonical.ambiguousAliases, duplicate.ambiguousAliases),
+    resolvingKeywords: unionStrings(canonical.resolvingKeywords, duplicate.resolvingKeywords),
+    excludeTerms: unionStrings(canonical.excludeTerms, duplicate.excludeTerms),
+  };
+}
+
+async function mergeMachineMetadata(tx: any, group: (typeof DUPLICATE_MACHINE_GROUPS)[number]) {
+  const rows = await tx.select().from(machines).where(inArray(machines.id, [group.canonicalId, group.duplicateId]));
+  const canonical = rows.find((row: MachineRecord) => row.id === group.canonicalId);
+  const duplicate = rows.find((row: MachineRecord) => row.id === group.duplicateId);
+  if (!canonical || !duplicate) throw new Error(`Machine metadata missing for ${group.canonicalId}/${group.duplicateId}`);
+  await tx.update(machines).set(mergeMachineMetadataValues(canonical, duplicate, group)).where(eq(machines.id, group.canonicalId));
 }
 
 export function mergeUniqueMachineRows<T extends { machineId: number }>(
@@ -122,6 +165,20 @@ async function mergeJudgments(tx: any, canonicalId: number, duplicateId: number)
   return { updated: result.rowsAffected ?? 0 };
 }
 
+export async function mergeDuplicateMachineGroup(tx: any, group: (typeof DUPLICATE_MACHINE_GROUPS)[number]) {
+  const existing = await tx.select({ id: machines.id }).from(machines).where(inArray(machines.id, [group.canonicalId, group.duplicateId]));
+  if (existing.some((row: { id: number }) => row.id === group.canonicalId) && !existing.some((row: { id: number }) => row.id === group.duplicateId)) {
+    return { alreadyMerged: true };
+  }
+  await mergeMachineMetadata(tx, group);
+  const links = await mergeLinks(tx, group.canonicalId, group.duplicateId);
+  const mentions = await mergeMentions(tx, group.canonicalId, group.duplicateId);
+  const votes = await mergeVotes(tx, group.canonicalId, group.duplicateId);
+  const judgments = await mergeJudgments(tx, group.canonicalId, group.duplicateId);
+  await tx.delete(machines).where(eq(machines.id, group.duplicateId));
+  return { alreadyMerged: false, links, mentions, votes, judgments };
+}
+
 export async function runDuplicateMachineMerge(apply: boolean) {
   const allMachines = await db.select().from(machines);
   const byId = new Map(allMachines.map((machine) => [machine.id, machine]));
@@ -129,7 +186,7 @@ export async function runDuplicateMachineMerge(apply: boolean) {
     ...group,
     validation: !byId.get(group.duplicateId) && byId.get(group.canonicalId)
       ? { ok: true, reason: "already merged" }
-      : validateDuplicateGroup(byId.get(group.canonicalId), byId.get(group.duplicateId), group.label),
+      : validateDuplicateGroup(byId.get(group.canonicalId), byId.get(group.duplicateId)),
   }));
   const rejected = validated.filter((group) => !group.validation.ok);
   if (rejected.length > 0) throw new Error(`Refusing merge: ${rejected.map((group) => `${group.duplicateId}: ${group.validation.reason}`).join(", ")}`);
@@ -161,11 +218,7 @@ export async function runDuplicateMachineMerge(apply: boolean) {
 
   await db.transaction(async (tx) => {
     for (const group of pendingGroups) {
-      await mergeLinks(tx, group.canonicalId, group.duplicateId);
-      await mergeMentions(tx, group.canonicalId, group.duplicateId);
-      await mergeVotes(tx, group.canonicalId, group.duplicateId);
-      await mergeJudgments(tx, group.canonicalId, group.duplicateId);
-      await tx.delete(machines).where(eq(machines.id, group.duplicateId));
+      await mergeDuplicateMachineGroup(tx, group);
     }
   });
   return { ...report, applied: true };

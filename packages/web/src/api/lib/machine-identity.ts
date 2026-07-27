@@ -1,5 +1,31 @@
 import { normalizeMachineType } from "../../shared/machine-type";
 
+type CanonicalMachineAlias = {
+  canonicalName: string;
+  canonicalMaker: string;
+  aliases: string[];
+};
+
+// These are explicit, reviewed aliases for the three duplicate rows being merged.
+// Numeric suffixes are never stripped globally, so different specifications remain distinct.
+export const CANONICAL_MACHINE_ALIASES: CanonicalMachineAlias[] = [
+  {
+    canonicalName: "デカスタeベルセルク無双 第2章 10連撃Ver.",
+    canonicalMaker: "ニューギン",
+    aliases: ["デカスタeベルセルク無双第2章10連撃Ver."],
+  },
+  {
+    canonicalName: "eフィーバー デッドマウント・デスプレイ 魂神9000",
+    canonicalMaker: "SANKYO",
+    aliases: ["eフィーバー デッドマウント・デスプレイ 魂神"],
+  },
+  {
+    canonicalName: "ぱちんこ 必殺仕事人VI",
+    canonicalMaker: "オッケー.",
+    aliases: ["ぱちんこ 必殺仕事人VI オッケー"],
+  },
+];
+
 export function normalizeMachineName(name: string) {
   return name
     .normalize("NFKC")
@@ -26,15 +52,23 @@ export function normalizeMachineMaker(maker: string | null | undefined) {
   return normalized;
 }
 
+function canonicalAliasFor(name: string) {
+  const normalized = normalizeMachineName(name);
+  return CANONICAL_MACHINE_ALIASES.find((entry) =>
+    [entry.canonicalName, ...entry.aliases].some((candidate) => normalizeMachineName(candidate) === normalized),
+  );
+}
+
 export function machineIdentityKey(machine: {
   name: string;
   maker?: string | null;
   type?: unknown;
   releaseDate?: string | null;
 }) {
+  const alias = canonicalAliasFor(machine.name);
   return [
-    normalizeMachineName(machine.name),
-    normalizeMachineMaker(machine.maker),
+    normalizeMachineName(alias?.canonicalName ?? machine.name),
+    normalizeMachineMaker(alias?.canonicalMaker ?? machine.maker),
     normalizeMachineType(machine.type) ?? "",
     machine.releaseDate ?? "",
   ].join("|");
