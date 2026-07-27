@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from "bun:test";
+import { beforeEach, describe, expect, test, mock } from "bun:test";
 import { JSDOM } from "jsdom";
 
 // Setup global JSDOM environment
@@ -12,6 +12,8 @@ global.location = dom.window.location as any;
 global.history = dom.window.history as any;
 global.localStorage = dom.window.localStorage as any;
 
+const machineQueryCalls: string[] = [];
+
 // Mock react-query hook methods fully to avoid provider dependence
 mock.module("@tanstack/react-query", () => ({
   useQueryClient: () => ({
@@ -23,6 +25,8 @@ mock.module("@tanstack/react-query", () => ({
   }),
   useQuery: (options: any) => {
     if (options.queryKey[0] === "machine") {
+      const contentType = options.queryKey[2] ?? "standard";
+      machineQueryCalls.push(contentType);
       return {
         isLoading: false,
         isError: false,
@@ -30,7 +34,7 @@ mock.module("@tanstack/react-query", () => ({
           machine: { id: 33, name: "Test Machine", maker: "Test Maker", type: "pachinko" },
           summary: { videoCount: 10, recentVideoCount: 2, recentViews: 500, rankingVideoCount: 8, lastUpdatedAt: Date.now(), periodStart: "2026-07-01", periodEnd: "2026-07-07" },
           mentions: [
-            { videoId: "vid1", videoTitle: "Test Video 1", publishedAt: Date.now(), viewCount: 1000, channelName: "Channel A", contentType: "short", hasTrend: true, viewDelta: 100 },
+            { videoId: `vid-${contentType}`, videoTitle: `${contentType} video`, publishedAt: Date.now(), viewCount: 1000, channelName: "Channel A", contentType, hasTrend: true, viewDelta: 100 },
           ],
           contentTypeCounts: { standard: 5, short: 3, live: 2 },
         },
@@ -69,6 +73,10 @@ function render(ui: React.ReactElement) {
 }
 
 describe("MachinePage tab & URL query parameter synchronization", () => {
+  beforeEach(() => {
+    machineQueryCalls.length = 0;
+  });
+
   test("contentType=short for short tab", async () => {
     dom.reconfigure({ url: "http://localhost/machines/33?contentType=short" });
     window.dispatchEvent(new dom.window.PopStateEvent("popstate"));
@@ -124,6 +132,29 @@ describe("MachinePage tab & URL query parameter synchronization", () => {
     });
 
     expect(window.location.search).toContain("contentType=short");
+    expect(machineQueryCalls).toContain("short");
+    expect(container.textContent).toContain("short video");
+    unmount();
+  });
+
+  test("switching from short to standard changes the requested and displayed content type", async () => {
+    dom.reconfigure({ url: "http://localhost/machines/33?contentType=short" });
+    window.dispatchEvent(new dom.window.PopStateEvent("popstate"));
+
+    const { container, unmount } = render(<MachinePage />);
+    expect(container.textContent).toContain("short video");
+
+    const standardTab = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("通常動画"),
+    );
+    expect(standardTab).toBeDefined();
+    act(() => {
+      standardTab!.click();
+    });
+
+    expect(machineQueryCalls.at(-1)).toBe("standard");
+    expect(container.textContent).toContain("standard video");
+    expect(container.textContent).not.toContain("short video");
     unmount();
   });
 
@@ -143,6 +174,36 @@ describe("MachinePage tab & URL query parameter synchronization", () => {
 
     expect(window.location.search).toContain("contentType=live");
     expect(window.location.search).toContain("sort=views");
+    expect(machineQueryCalls.at(-1)).toBe("live");
+    unmount();
+  });
+
+  test("switching to live displays live data and browser back restores URL, tab, and data", async () => {
+    dom.reconfigure({ url: "http://localhost/machines/33?contentType=short" });
+    window.dispatchEvent(new dom.window.PopStateEvent("popstate"));
+
+    const { container, unmount } = render(<MachinePage />);
+    const liveTab = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("ライブ"),
+    );
+    expect(liveTab).toBeDefined();
+    act(() => {
+      liveTab!.click();
+    });
+    expect(window.location.search).toContain("contentType=live");
+    expect(container.textContent).toContain("live video");
+    expect(machineQueryCalls.at(-1)).toBe("live");
+
+    act(() => {
+      dom.reconfigure({ url: "http://localhost/machines/33?contentType=short" });
+      window.dispatchEvent(new dom.window.PopStateEvent("popstate"));
+    });
+    expect(container.textContent).toContain("short video");
+    expect(container.textContent).not.toContain("live video");
+    const shortTab = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("ショート"),
+    );
+    expect(shortTab?.className).toContain("text-gold");
     unmount();
   });
 

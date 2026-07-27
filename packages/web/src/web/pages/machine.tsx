@@ -52,6 +52,7 @@ function MachinePage() {
       nextParams.set("sort", next.sort);
     }
     setLocation(`/machines/${id}?${nextParams.toString()}`);
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
   };
 
   if (detail.isLoading) return <div className="animate-pulse h-64 rounded-xl border surface-card" />;

@@ -50,6 +50,7 @@ function VideosTrendingPage() {
       params.set("mode", next.mode ?? mode);
       params.delete("type");
       setLocation(`${path || "/videos/trending"}?${params.toString()}`);
+      window.dispatchEvent(new window.PopStateEvent("popstate"));
     });
   };
 

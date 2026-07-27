@@ -28,7 +28,7 @@ export function useSearch() {
     };
   }, []);
 
-  return search;
+  return typeof window === "undefined" ? search : window.location.search;
 }
 
 export function isVideoContentTypeValue(value: string | null | undefined): value is VideoContentTypeValue {
