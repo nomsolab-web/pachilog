@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 export const VIDEO_CONTENT_TYPE_VALUES = ["standard", "short", "live", "promotion", "unknown"] as const;
 export type VideoContentTypeValue = (typeof VIDEO_CONTENT_TYPE_VALUES)[number];
 export type VideoContentTypeTab = { value: VideoContentTypeValue; label: string };
@@ -11,6 +13,23 @@ export const VIDEO_CONTENT_TYPE_TABS: VideoContentTypeTab[] = [
 ];
 
 export const DEFAULT_VIDEO_CONTENT_TYPE: VideoContentTypeValue = "standard";
+
+export function useSearch() {
+  const [search, setSearch] = useState(() => (typeof window === "undefined" ? "" : window.location.search));
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setSearch(window.location.search);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  return search;
+}
 
 export function isVideoContentTypeValue(value: string | null | undefined): value is VideoContentTypeValue {
   return !!value && (VIDEO_CONTENT_TYPE_VALUES as readonly string[]).includes(value);
