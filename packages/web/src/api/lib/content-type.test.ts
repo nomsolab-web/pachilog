@@ -27,13 +27,13 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "\u914d\u4fe1\u4e88\u5b9a", liveBroadcastContent: "upcoming" }).contentType).toBe("live");
   });
 
-  test("classifies archived live metadata when any broadcast timestamp exists", () => {
+  test("does not classify a completed premiere from live metadata alone", () => {
     for (const liveStreamingDetails of [
       { actualStartTime: "2026-07-01T12:00:00Z" },
       { actualEndTime: "2026-07-01T13:00:00Z" },
       { scheduledStartTime: "2026-07-01T12:00:00Z" },
     ]) {
-      expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails }).contentType).toBe("live");
+      expect(classifyVideoContent({ title: "通常番組収録", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails }).contentType).toBe("standard");
     }
   });
 
@@ -42,7 +42,17 @@ describe("video content type classification", () => {
   });
 
   test("trusts live metadata even when the title says it is a clipped summary", () => {
-    expect(classifyVideoContent({ title: "生配信切り抜きまとめ", liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+    expect(classifyVideoContent({ title: "生配信", liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+  });
+
+  test("requires an explicit live title signal for completed broadcast metadata", () => {
+    for (const title of ["生配信", "ライブ配信", "生放送", "実機配信", "🔴LIVE", "配信アーカイブ"]) {
+      expect(classifyVideoContent({ title, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+    }
+  });
+
+  test("keeps a five-minute singing premiere standard", () => {
+    expect(classifyVideoContent({ title: "【歌ってみた】乙女フェスティバル", durationSeconds: 303, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("standard");
   });
 
   test("keeps an existing live classification for a clipped-summary title", () => {

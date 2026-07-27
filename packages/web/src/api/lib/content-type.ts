@@ -52,6 +52,14 @@ const LIVE_CLIP_OR_NON_LIVE_PATTERNS = [
   /\u30cf\u30e9\u30ad\u30ea\s*drive/i,
   /\u30cf\u30e9\u30ad\u30ea\u30c9\u30e9\u30a4\u30d6/i,
 ];
+const DEFINITE_LIVE_TITLE_PATTERNS = [
+  /生配信/i,
+  /ライブ配信/i,
+  /生放送/i,
+  /実機配信/i,
+  /🔴\s*live/i,
+  /配信アーカイブ/i,
+];
 const SHORTS_HASHTAG_PATTERN = /(^|[\s#])#?shorts?(\s|$)/i;
 const PACHINKO_SHORT_FALSE_POSITIVE_PATTERN = /\u30b7\u30e7\u30fc\u30c8\s*st/i;
 
@@ -85,11 +93,14 @@ function liveReason(input: VideoContentClassificationInput) {
   const liveBroadcastContent = input.liveBroadcastContent?.toLowerCase();
   const details = input.liveStreamingDetails;
   if (liveBroadcastContent === "live" || liveBroadcastContent === "upcoming") return `youtube liveBroadcastContent=${liveBroadcastContent}`;
-  if (details?.actualStartTime || details?.actualEndTime || details?.scheduledStartTime) {
-    return "youtube liveStreamingDetails contains a broadcast timestamp";
-  }
   if (input.existingContentType === "live") return "existing live classification retained because live metadata is inconclusive";
-  if (LIVE_CLIP_OR_NON_LIVE_PATTERNS.some((pattern) => pattern.test(input.title))) return null;
+  const hasBroadcastTimestamp = details?.actualStartTime || details?.actualEndTime || details?.scheduledStartTime;
+  if (hasBroadcastTimestamp) {
+    if (LIVE_CLIP_OR_NON_LIVE_PATTERNS.some((pattern) => pattern.test(input.title))) return null;
+    if (DEFINITE_LIVE_TITLE_PATTERNS.some((pattern) => pattern.test(input.title))) {
+      return "youtube broadcast timestamp plus explicit live title signal";
+    }
+  }
   return null;
 }
 

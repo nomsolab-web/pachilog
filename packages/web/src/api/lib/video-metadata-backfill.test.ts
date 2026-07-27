@@ -61,19 +61,26 @@ describe("video metadata backfill planning", () => {
   });
 
   test("uses refreshed live metadata when stored fields are already populated", () => {
-    const ids = ["vU3FTxrbhWo", "oZ_pSSNFu0Q", "8Ok-UWWfGeo", "kcKS4gHEaIA"];
+    const ids = ["oZ_pSSNFu0Q", "8Ok-UWWfGeo", "kcKS4gHEaIA"];
     const result = buildVideoMetadataBackfillUpdates(
       ids.map((videoId) => ({ videoId, title: "配信アーカイブ", durationSeconds: 1800, liveBroadcastContent: "none" })),
       ids.map((videoId) => ({ videoId, durationSeconds: 1800, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } })),
     );
-
-    expect(result.updates).toHaveLength(4);
+    expect(result.updates).toHaveLength(3);
     expect(result.updates.every((update) => update.classification.contentType === "live")).toBe(true);
+  });
+
+  test("keeps the singing premiere standard during refresh", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "vU3FTxrbhWo", title: "【歌ってみた】乙女フェスティバル", durationSeconds: 303, liveBroadcastContent: "none" }],
+      [{ videoId: "vU3FTxrbhWo", durationSeconds: 303, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }],
+    );
+    expect(result.updates[0]?.classification.contentType).toBe("standard");
   });
 
   test("propagates refreshed live classification into dry-run counts and liveChanges", () => {
     const result = buildVideoMetadataBackfillUpdates(
-      [{ videoId: "vU3FTxrbhWo", title: "配信", durationSeconds: 120, liveBroadcastContent: "none", contentType: "standard" }],
+      [{ videoId: "vU3FTxrbhWo", title: "生配信", durationSeconds: 120, liveBroadcastContent: "none", contentType: "standard" }],
       [{ videoId: "vU3FTxrbhWo", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }],
     );
     const change = { before: "standard", after: result.updates[0]!.classification.contentType };
