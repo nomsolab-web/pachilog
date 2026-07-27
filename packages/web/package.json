@@ -21,6 +21,7 @@
     "channels:discover": "bun --env-file=../../.env src/api/data/discover-channels.ts",
     "data:diagnose-machine-vote-duplicates": "bun --env-file=../../.env src/api/data/diagnose-machine-vote-duplicates.ts",
     "data:rebuild-machine-mentions": "bun --env-file=../../.env src/api/data/rebuild-machine-mentions.ts",
+    "data:merge-duplicate-machines": "bun --env-file=../../.env src/api/data/merge-duplicate-machines.ts",
     "data:reclassify-videos": "bun --env-file=../../.env src/api/data/reclassify-videos.ts"
   },
   "dependencies": {
