@@ -27,8 +27,18 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "\u914d\u4fe1\u4e88\u5b9a", liveBroadcastContent: "upcoming" }).contentType).toBe("live");
   });
 
-  test("does not infer a completed live archive from liveStreamingDetails alone", () => {
-    expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 3600, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }).contentType).toBe("standard");
+  test("classifies archived live metadata when any broadcast timestamp exists", () => {
+    for (const liveStreamingDetails of [
+      { actualStartTime: "2026-07-01T12:00:00Z" },
+      { actualEndTime: "2026-07-01T13:00:00Z" },
+      { scheduledStartTime: "2026-07-01T12:00:00Z" },
+    ]) {
+      expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails }).contentType).toBe("live");
+    }
+  });
+
+  test("keeps promotion ahead of live metadata", () => {
+    expect(classifyVideoContent({ title: "公式 WebCM", channelCategory: "manufacturer", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("promotion");
   });
 
   test("prioritizes a long completed live archive over a shorts hashtag", () => {
