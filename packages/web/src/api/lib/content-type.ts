@@ -82,7 +82,6 @@ function promotionReason(title: string, officialChannel: boolean) {
 }
 
 function liveReason(input: VideoContentClassificationInput) {
-  if (LIVE_CLIP_OR_NON_LIVE_PATTERNS.some((pattern) => pattern.test(input.title))) return null;
   const liveBroadcastContent = input.liveBroadcastContent?.toLowerCase();
   const details = input.liveStreamingDetails;
   if (liveBroadcastContent === "live" || liveBroadcastContent === "upcoming") return `youtube liveBroadcastContent=${liveBroadcastContent}`;
@@ -90,6 +89,7 @@ function liveReason(input: VideoContentClassificationInput) {
     return "youtube liveStreamingDetails contains a broadcast timestamp";
   }
   if (input.existingContentType === "live") return "existing live classification retained because live metadata is inconclusive";
+  if (LIVE_CLIP_OR_NON_LIVE_PATTERNS.some((pattern) => pattern.test(input.title))) return null;
   return null;
 }
 

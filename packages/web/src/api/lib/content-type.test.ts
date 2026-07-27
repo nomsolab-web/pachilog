@@ -41,6 +41,14 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "公式 WebCM", channelCategory: "manufacturer", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("promotion");
   });
 
+  test("trusts live metadata even when the title says it is a clipped summary", () => {
+    expect(classifyVideoContent({ title: "生配信切り抜きまとめ", liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+  });
+
+  test("keeps an existing live classification for a clipped-summary title", () => {
+    expect(classifyVideoContent({ title: "生配信切り抜きまとめ", liveBroadcastContent: "none", existingContentType: "live" }).contentType).toBe("live");
+  });
+
   test("prioritizes a long completed live archive over a shorts hashtag", () => {
     expect(
       classifyVideoContent({
