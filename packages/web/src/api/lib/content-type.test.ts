@@ -27,8 +27,36 @@ describe("video content type classification", () => {
     expect(classifyVideoContent({ title: "\u914d\u4fe1\u4e88\u5b9a", liveBroadcastContent: "upcoming" }).contentType).toBe("live");
   });
 
-  test("does not infer a completed live archive from liveStreamingDetails alone", () => {
-    expect(classifyVideoContent({ title: "実況配信アーカイブ", durationSeconds: 3600, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }).contentType).toBe("standard");
+  test("does not classify a completed premiere from live metadata alone", () => {
+    for (const liveStreamingDetails of [
+      { actualStartTime: "2026-07-01T12:00:00Z" },
+      { actualEndTime: "2026-07-01T13:00:00Z" },
+      { scheduledStartTime: "2026-07-01T12:00:00Z" },
+    ]) {
+      expect(classifyVideoContent({ title: "通常番組収録", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails }).contentType).toBe("standard");
+    }
+  });
+
+  test("keeps promotion ahead of live metadata", () => {
+    expect(classifyVideoContent({ title: "公式 WebCM", channelCategory: "manufacturer", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("promotion");
+  });
+
+  test("trusts live metadata even when the title says it is a clipped summary", () => {
+    expect(classifyVideoContent({ title: "生配信", liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+  });
+
+  test("requires an explicit live title signal for completed broadcast metadata", () => {
+    for (const title of ["生配信", "ライブ配信", "生放送", "実機配信", "🔴LIVE", "配信アーカイブ"]) {
+      expect(classifyVideoContent({ title, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("live");
+    }
+  });
+
+  test("keeps a five-minute singing premiere standard", () => {
+    expect(classifyVideoContent({ title: "【歌ってみた】乙女フェスティバル", durationSeconds: 303, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }).contentType).toBe("standard");
+  });
+
+  test("keeps an existing live classification for a clipped-summary title", () => {
+    expect(classifyVideoContent({ title: "生配信切り抜きまとめ", liveBroadcastContent: "none", existingContentType: "live" }).contentType).toBe("live");
   });
 
   test("prioritizes a long completed live archive over a shorts hashtag", () => {

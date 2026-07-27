@@ -61,12 +61,44 @@ describe("video metadata backfill planning", () => {
   });
 
   test("uses refreshed live metadata when stored fields are already populated", () => {
+    const ids = ["oZ_pSSNFu0Q", "8Ok-UWWfGeo", "kcKS4gHEaIA"];
     const result = buildVideoMetadataBackfillUpdates(
-      [{ videoId: "archive-1", title: "\u914d\u4fe1\u30a2\u30fc\u30ab\u30a4\u30d6", durationSeconds: 1800, liveBroadcastContent: "none" }],
-      [{ videoId: "archive-1", durationSeconds: 1800, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z", actualEndTime: "2026-07-01T13:00:00Z" } }],
+      ids.map((videoId) => ({ videoId, title: "配信アーカイブ", durationSeconds: 1800, liveBroadcastContent: "none" })),
+      ids.map((videoId) => ({ videoId, durationSeconds: 1800, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } })),
+    );
+    expect(result.updates).toHaveLength(3);
+    expect(result.updates.every((update) => update.classification.contentType === "live")).toBe(true);
+  });
+
+  test("keeps the singing premiere standard during refresh", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "vU3FTxrbhWo", title: "【歌ってみた】乙女フェスティバル", durationSeconds: 303, liveBroadcastContent: "none" }],
+      [{ videoId: "vU3FTxrbhWo", durationSeconds: 303, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }],
+    );
+    expect(result.updates[0]?.classification.contentType).toBe("standard");
+  });
+
+  test("propagates refreshed live classification into dry-run counts and liveChanges", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "vU3FTxrbhWo", title: "生配信", durationSeconds: 120, liveBroadcastContent: "none", contentType: "standard" }],
+      [{ videoId: "vU3FTxrbhWo", durationSeconds: 120, liveBroadcastContent: "none", liveStreamingDetails: { actualStartTime: "2026-07-01T12:00:00Z" } }],
+    );
+    const change = { before: "standard", after: result.updates[0]!.classification.contentType };
+    const afterCounts: Record<string, number> = { standard: 0, short: 0, live: 0, promotion: 0, unknown: 0 };
+    afterCounts[change.after] += 1;
+    const liveChanges = [change].filter((item) => item.before === "live" || item.after === "live");
+    expect(change).toEqual({ before: "standard", after: "live" });
+    expect(afterCounts).toEqual({ standard: 0, short: 0, live: 1, promotion: 0, unknown: 0 });
+    expect(liveChanges).toHaveLength(1);
+  });
+
+  test("does not downgrade an existing live video", () => {
+    const result = buildVideoMetadataBackfillUpdates(
+      [{ videoId: "already-live", title: "配信アーカイブ", durationSeconds: 1800, liveBroadcastContent: "none", contentType: "live" }],
+      [{ videoId: "already-live", durationSeconds: 1800, liveBroadcastContent: "none" }],
     );
 
-    expect(result.updates[0]?.classification.contentType).toBe("standard");
+    expect(result.updates[0]?.classification.contentType).toBe("live");
   });
 
   test("does not classify missing metadata rows after an API failure", () => {
