@@ -11,6 +11,7 @@ import {
   updateContentTypeSearchParams,
   videoTrendMetricLabel,
   videoTrendingQueryParams,
+  useSearch,
   type VideoContentTypeValue,
 } from "../lib/video-content-types";
 
@@ -18,8 +19,9 @@ type Mode = "previous" | "7d";
 
 function VideosTrendingPage() {
   const [location, setLocation] = useLocation();
+  const search = useSearch();
   const [, startTransition] = useTransition();
-  const { mode, contentType } = useVideoTrendingUrlState(location);
+  const { mode, contentType } = useVideoTrendingUrlState(search);
   const [path] = location.split("?");
 
   const videos = useInfiniteQuery({
@@ -41,7 +43,7 @@ function VideosTrendingPage() {
   const updateParams = (next: { contentType?: VideoContentTypeValue; mode?: Mode }) => {
     startTransition(() => {
       const params = updateContentTypeSearchParams(
-        queryStringFromLocation(location),
+        search,
         next.contentType ?? contentType,
         { resetCursor: true },
       );
@@ -52,11 +54,11 @@ function VideosTrendingPage() {
   };
 
   useEffect(() => {
-    const normalized = normalizeContentTypeSearchParams(queryStringFromLocation(location));
+    const normalized = normalizeContentTypeSearchParams(search);
     if (normalized.shouldReplace) {
       setLocation(`${path || "/videos/trending"}?${normalized.params.toString()}`, { replace: true });
     }
-  }, [location, path, setLocation]);
+  }, [search, path, setLocation]);
 
   return (
     <div>
@@ -248,8 +250,7 @@ export function EmptyState() {
 
 function queryStringFromLocation(location: string) {
   const queryStart = location.indexOf("?");
-  if (queryStart >= 0) return location.slice(queryStart);
-  return typeof window === "undefined" ? "" : window.location.search;
+  return queryStart >= 0 ? location.slice(queryStart) : "";
 }
 
 export default VideosTrendingPage;
