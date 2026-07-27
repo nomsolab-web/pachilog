@@ -168,7 +168,7 @@ async function mergeJudgments(tx: any, canonicalId: number, duplicateId: number)
 export async function mergeDuplicateMachineGroup(tx: any, group: (typeof DUPLICATE_MACHINE_GROUPS)[number]) {
   const existing = await tx.select({ id: machines.id }).from(machines).where(inArray(machines.id, [group.canonicalId, group.duplicateId]));
   if (existing.some((row: { id: number }) => row.id === group.canonicalId) && !existing.some((row: { id: number }) => row.id === group.duplicateId)) {
-    return { alreadyMerged: true };
+    return { alreadyMerged: true, verification: await verifyMergedMachineGroup(tx, group) };
   }
   await mergeMachineMetadata(tx, group);
   const links = await mergeLinks(tx, group.canonicalId, group.duplicateId);
@@ -176,7 +176,30 @@ export async function mergeDuplicateMachineGroup(tx: any, group: (typeof DUPLICA
   const votes = await mergeVotes(tx, group.canonicalId, group.duplicateId);
   const judgments = await mergeJudgments(tx, group.canonicalId, group.duplicateId);
   await tx.delete(machines).where(eq(machines.id, group.duplicateId));
-  return { alreadyMerged: false, links, mentions, votes, judgments };
+  const verification = await verifyMergedMachineGroup(tx, group);
+  return { alreadyMerged: false, links, mentions, votes, judgments, verification };
+}
+
+export async function verifyMergedMachineGroup(tx: any, group: (typeof DUPLICATE_MACHINE_GROUPS)[number]) {
+  const canonicalRows = await tx.select({ id: machines.id }).from(machines).where(eq(machines.id, group.canonicalId));
+  const duplicateRows = await tx.select({ id: machines.id }).from(machines).where(eq(machines.id, group.duplicateId));
+  const [links, mentions, votes, judgments] = await Promise.all([
+    tx.select({ id: videoMachineLinks.id }).from(videoMachineLinks).where(eq(videoMachineLinks.machineId, group.duplicateId)),
+    tx.select({ id: machineMentions.id }).from(machineMentions).where(eq(machineMentions.machineId, group.duplicateId)),
+    tx.select({ id: machineVotes.id }).from(machineVotes).where(eq(machineVotes.machineId, group.duplicateId)),
+    tx.select({ id: machineVideoJudgments.id }).from(machineVideoJudgments).where(eq(machineVideoJudgments.machineId, group.duplicateId)),
+  ]);
+  const result = {
+    canonicalId: group.canonicalId,
+    canonicalCount: canonicalRows.length,
+    duplicateId: group.duplicateId,
+    duplicateCount: duplicateRows.length,
+    orphanReferences: { videoMachineLinks: links.length, machineMentions: mentions.length, machineVotes: votes.length, machineVideoJudgments: judgments.length },
+  };
+  if (result.canonicalCount !== 1 || result.duplicateCount !== 0 || Object.values(result.orphanReferences).some((count) => count !== 0)) {
+    throw new Error(`Post-merge verification failed for ${group.canonicalId}/${group.duplicateId}: ${JSON.stringify(result)}`);
+  }
+  return result;
 }
 
 export async function runDuplicateMachineMerge(apply: boolean) {
@@ -216,12 +239,14 @@ export async function runDuplicateMachineMerge(apply: boolean) {
   const report = { groups: validated, groupCounts, linksBefore: links.length, linksAfter: groupCounts.reduce((sum, group) => sum + group.linksAfter, 0), mentionsBefore: mentions.length, mentionsAfter: groupCounts.reduce((sum, group) => sum + group.mentionsAfter, 0), votesBefore: votes.length, votesAfter: groupCounts.reduce((sum, group) => sum + group.votesAfter, 0), judgmentsBefore: judgments.length, judgmentsToMove: groupCounts.reduce((sum, group) => sum + group.judgmentsToMove, 0), applied: false };
   if (!apply) return report;
 
-  await db.transaction(async (tx) => {
+  const verification = await db.transaction(async (tx) => {
+    const results = [];
     for (const group of pendingGroups) {
-      await mergeDuplicateMachineGroup(tx, group);
+      results.push(await mergeDuplicateMachineGroup(tx, group));
     }
+    return results.map((result) => result.verification);
   });
-  return { ...report, applied: true };
+  return { ...report, applied: true, verification };
 }
 
 if (import.meta.main) {

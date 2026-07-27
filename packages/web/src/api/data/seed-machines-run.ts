@@ -6,17 +6,14 @@ import { db } from "../database";
 import { machines } from "../database/schema";
 import { SEED_MACHINES } from "./seed-machines";
 import { buildMachineSeedValues } from "./machine-seed-values";
-import { machineIdentityKey } from "../lib/machine-identity";
+import { findExistingMachineForSeed } from "../lib/machine-seed-matching";
 
 async function main() {
   let inserted = 0;
   let updated = 0;
   const existingMachines = await db.select().from(machines);
   for (const m of SEED_MACHINES) {
-    const seedIdentity = machineIdentityKey(m);
-    const existing = existingMachines.find(
-      (machine) => machine.name === m.name || machineIdentityKey(machine) === seedIdentity,
-    );
+    const existing = findExistingMachineForSeed(existingMachines, m);
     const values = buildMachineSeedValues(m);
     if (existing) {
       await db.update(machines).set(values).where(eq(machines.id, existing.id));
