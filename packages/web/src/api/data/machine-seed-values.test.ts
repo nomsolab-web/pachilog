@@ -24,4 +24,10 @@ describe("machine seed persistence values", () => {
     expect(values).not.toHaveProperty("ambiguousAliases");
     expect(values).not.toHaveProperty("resolvingKeywords");
   });
+
+  test("persists only canonical machine type values", () => {
+    expect(buildMachineSeedValues({ name: "slot", maker: "maker", releaseDate: null, type: "pachislot" }).type).toBe("slot");
+    expect(buildMachineSeedValues({ name: "pachinko", maker: "maker", releaseDate: null, type: "パチンコ" }).type).toBe("pachinko");
+    expect(buildMachineSeedValues({ name: "unknown", maker: "maker", releaseDate: null, type: "unverified" }).type).toBeNull();
+  });
 });

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Search, TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
 import { api } from "../lib/api";
+import { machineTypeLabel, normalizeMachineType } from "../../shared/machine-type";
 import { formatJapaneseDate } from "../lib/format";
 import { RankingCard } from "../components/ranking-card";
 import { VideoCard } from "../components/video-card";
@@ -313,11 +314,11 @@ function Index() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold truncate text-sm sm:text-base">{machine.name}</span>
-                    {machine.type && (
+                    {machineTypeLabel(machine.type) && (
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                        machine.type === "pachinko" ? "bg-primary/10 text-primary border border-primary/20" : "bg-gold/10 text-gold border border-gold/20"
+                        normalizeMachineType(machine.type) === "pachinko" ? "bg-primary/10 text-primary border border-primary/20" : normalizeMachineType(machine.type) === "slot" ? "bg-gold/10 text-gold border border-gold/20" : "bg-secondary text-muted-foreground border border-border"
                       }`}>
-                        {machine.type === "pachinko" ? "パチンコ" : "パチスロ"}
+                        {machineTypeLabel(machine.type)}
                       </span>
                     )}
                   </div>

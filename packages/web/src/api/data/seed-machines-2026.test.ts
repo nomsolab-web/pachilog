@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { LEGACY_SEED_MACHINES, SEED_MACHINES } from "./seed-machines";
 import { SEED_MACHINES_2026 } from "./seed-machines-2026";
+import { normalizeMachineType } from "../../shared/machine-type";
 
 describe("2026 machine seed", () => {
   test("contains at least 50 unique, typed machines", () => {
@@ -8,11 +9,15 @@ describe("2026 machine seed", () => {
     expect(SEED_MACHINES_2026.length).toBeGreaterThanOrEqual(50);
     expect(new Set(names).size).toBe(names.length);
     expect(SEED_MACHINES_2026.filter((machine) => machine.type === "pachinko").length).toBeGreaterThan(0);
-    expect(SEED_MACHINES_2026.filter((machine) => machine.type === "pachislot").length).toBeGreaterThan(0);
+    expect(SEED_MACHINES_2026.filter((machine) => machine.type === "slot").length).toBeGreaterThan(0);
   });
 
   test("does not use guessed aliases", () => {
     expect(SEED_MACHINES_2026.every((machine) => (machine.aliases ?? []).length === 0)).toBe(true);
+  });
+
+  test("uses only canonical machine type values", () => {
+    expect(SEED_MACHINES_2026.every((machine) => normalizeMachineType(machine.type) === machine.type)).toBe(true);
   });
 
   test("keeps the five legacy machines and merges duplicate names", () => {

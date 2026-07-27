@@ -1,4 +1,5 @@
 import type { SeedMachine } from "./seed-machines";
+import { normalizeMachineType } from "../../shared/machine-type";
 
 export function buildMachineSeedValues(machine: SeedMachine) {
   return Object.fromEntries(
@@ -6,7 +7,7 @@ export function buildMachineSeedValues(machine: SeedMachine) {
       name: machine.name,
       maker: machine.maker,
       releaseDate: machine.releaseDate,
-      type: machine.type,
+      type: machine.type === undefined ? undefined : normalizeMachineType(machine.type),
       shortName: machine.shortName,
       aliases: machine.aliases,
       excludeTerms: machine.excludeTerms,

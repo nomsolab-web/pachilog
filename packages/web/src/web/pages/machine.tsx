@@ -5,6 +5,7 @@ import { Link, useLocation, useParams } from "wouter";
 import { api } from "../lib/api";
 import { MachineVoteWidget } from "../components/machine-vote-widget";
 import { VideoCard } from "../components/video-card";
+import { machineTypeLabel } from "../../shared/machine-type";
 import {
   VIDEO_CONTENT_TYPE_TABS,
   machineDetailQueryParams,
@@ -79,7 +80,7 @@ function MachinePage() {
             <h1 className="mb-3 break-words font-display text-3xl font-extrabold">{machine.name}</h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5"><Factory className="size-4" />{machine.maker ?? "メーカー未設定"}</span>
-              <span className="inline-flex items-center gap-1.5"><Film className="size-4" />{machine.type === "pachinko" ? "パチンコ" : machine.type === "slot" ? "パチスロ" : "種別未設定"}</span>
+              <span className="inline-flex items-center gap-1.5"><Film className="size-4" />{machineTypeLabel(machine.type)}</span>
               <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" />{machine.releaseDate ? `${formatDate(machine.releaseDate)} 導入` : "導入日未設定"}</span>
               {machine.officialUrl && <a href={machine.officialUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-info hover:text-info/80"><ExternalLink className="size-4" />公式サイト</a>}
             </div>
