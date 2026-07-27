@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createClient, type Client } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import * as schema from "../database/schema";
 import type { Hono } from "hono";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,7 +9,6 @@ import { join } from "node:path";
 
 let app: Hono;
 let client: Client;
-let appDbClient: Client;
 let tempDir: string;
 let ipCounter = 0;
 
@@ -15,11 +16,9 @@ describe("machine votes API", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "pachilog-machine-votes-"));
     const databaseUrl = `file:${join(tempDir, "test.db")}`;
-    process.env.DATABASE_URL = databaseUrl;
-    process.env.DATABASE_AUTH_TOKEN = "";
     client = createClient({ url: databaseUrl });
     await client.batch([
-      `CREATE TABLE machines (
+      `CREATE TABLE IF NOT EXISTS machines (
         id integer PRIMARY KEY AUTOINCREMENT,
         name text NOT NULL,
         short_name text,
@@ -35,7 +34,7 @@ describe("machine votes API", () => {
         created_at integer NOT NULL,
         updated_at integer
       )`,
-      `CREATE TABLE machine_votes (
+      `CREATE TABLE IF NOT EXISTS machine_votes (
         id integer PRIMARY KEY AUTOINCREMENT,
         machine_id integer NOT NULL,
         vote_type text NOT NULL,
@@ -43,21 +42,31 @@ describe("machine votes API", () => {
         created_at integer NOT NULL,
         FOREIGN KEY(machine_id) REFERENCES machines(id) ON DELETE cascade
       )`,
-      `CREATE UNIQUE INDEX machine_vote_fingerprint_idx ON machine_votes (machine_id, voter_fingerprint)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (1, 'machine one', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (2, 'machine two', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (3, 'machine three', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (4, 'machine four', 0)`,
-      `INSERT INTO machines (id, name, created_at) VALUES (5, 'machine five', 0)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS machine_vote_fingerprint_idx ON machine_votes (machine_id, voter_fingerprint)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (1, 'machine one', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (2, 'machine two', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (3, 'machine three', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (4, 'machine four', 0)`,
+      `INSERT OR IGNORE INTO machines (id, name, created_at) VALUES (5, 'machine five', 0)`,
     ]);
-    app = (await import("../index")).default;
-    appDbClient = (await import("../database")).client;
+    const db = drizzle(client, { schema });
+    const { createApp } = await import("../index");
+    app = createApp(db);
   });
 
   afterAll(async () => {
-    appDbClient.close();
     client.close();
-    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await rm(tempDir, { recursive: true, force: true });
+        break;
+      } catch (err) {
+        retries--;
+        if (retries === 0) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
   });
 
   test("records a new vote", async () => {

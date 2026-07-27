@@ -1,32 +1,38 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { channelsRoute } from "./routes/channels";
-import { rankings } from "./routes/rankings";
-import { collect } from "./routes/collect";
-import { machinesRoute } from "./routes/machines";
-import { collectMachines } from "./routes/collect-machines";
-import { videosRoute } from "./routes/videos";
-import { weekly } from "./routes/weekly";
+import { createChannelsRoute } from "./routes/channels";
+import { createRankingsRoute } from "./routes/rankings";
+import { createCollectRoute } from "./routes/collect";
+import { createMachinesRoute } from "./routes/machines";
+import { createCollectMachinesRoute } from "./routes/collect-machines";
+import { createVideosRoute } from "./routes/videos";
+import { createWeeklyRoute } from "./routes/weekly";
 import { httpCache } from "./middleware/cache";
+import { db as defaultDb } from "./database";
 
-const app = new Hono()
-  .basePath("api")
-  .use(cors({ origin: (origin) => origin ?? "*", credentials: true, exposeHeaders: ["set-auth-token"] }))
-  .use(httpCache)
-  .get("/ping", (c) => c.json({ message: `Pong! ${Date.now()}` }, 200))
-  .get("/health", (c) => c.json({ status: "ok" }, 200))
-  .route("/channels", channelsRoute)
-  .route("/rankings", rankings)
-  .route("/collect", collect)
-  .route("/machines", machinesRoute)
-  .route("/collect-machines", collectMachines)
-  .route("/videos", videosRoute)
-  .route("/weekly", weekly);
+export function createApp(db = defaultDb) {
+  const app = new Hono()
+    .basePath("api")
+    .use(cors({ origin: (origin) => origin ?? "*", credentials: true, exposeHeaders: ["set-auth-token"] }))
+    .use(httpCache)
+    .get("/ping", (c) => c.json({ message: `Pong! ${Date.now()}` }, 200))
+    .get("/health", (c) => c.json({ status: "ok" }, 200))
+    .route("/channels", createChannelsRoute(db))
+    .route("/rankings", createRankingsRoute(db))
+    .route("/collect", createCollectRoute(db))
+    .route("/machines", createMachinesRoute(db))
+    .route("/collect-machines", createCollectMachinesRoute(db))
+    .route("/videos", createVideosRoute(db))
+    .route("/weekly", createWeeklyRoute(db));
 
-app.onError((err, c) => {
-  console.error(err);
-  return c.json({ error: "internal_server_error", message: err.message }, 500);
-});
+  app.onError((err, c) => {
+    console.error(err);
+    return c.json({ error: "internal_server_error", message: err.message }, 500);
+  });
 
+  return app;
+}
+
+const app = createApp(defaultDb);
 export type AppType = typeof app;
 export default app;

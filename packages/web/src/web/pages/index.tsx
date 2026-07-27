@@ -67,11 +67,7 @@ function Index() {
     .filter((entry) => entry.name.toLowerCase().includes(query.trim().toLowerCase()))
     .slice(0, 5); // Limit to top 5 on homepage for above-the-fold visibility
 
-  const latestDate = useMemo(() => {
-    if (!rankings.data) return null;
-    const all = [...rankings.data.rising, ...rankings.data.falling].map((entry) => entry.latestDate).filter(Boolean);
-    return all.sort().at(-1) ?? null;
-  }, [rankings.data]);
+  const latestDate = rankings.data && !("error" in rankings.data) ? rankings.data.latestDate : null;
 
   const trendingMachinesList = useMemo(() => {
     if (!machines.data || !("machines" in machines.data)) return [];
@@ -113,13 +109,13 @@ function Index() {
               <div key={index} className="h-64 rounded-xl border surface-card animate-pulse" />
             ))}
           </div>
-        ) : (trendingVideos.data?.videos ?? []).length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-10 text-center text-sm text-muted-foreground">
-            動画履歴を蓄積中です。
+        ) : trendingVideos.isError ? (
+          <div className="rounded-xl border border-dashed border-destructive/40 surface-card px-5 py-10 text-center text-sm text-destructive bg-destructive/5">
+            動画データの取得に失敗しました。時間をおいて再度お試しください。
           </div>
-        ) : (
+        ) : (trendingVideos.data && !("error" in trendingVideos.data) && trendingVideos.data.videos.length > 0) ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {(trendingVideos.data?.videos ?? []).slice(0, 5).map((video) => (
+            {trendingVideos.data.videos.slice(0, 5).map((video) => (
               <VideoCard
                 key={video.videoId}
                 videoId={video.videoId}
@@ -130,9 +126,17 @@ function Index() {
                 channelName={video.channelName}
                 channelThumbnailUrl={video.channelThumbnailUrl}
                 machineTags={video.machineTags}
-                metric={video.hasTrend ? `+${video.viewDelta.toLocaleString("ja-JP")}回` : "データ蓄積中"}
+                metric={
+                  video.hasTrend
+                    ? `+${video.viewDelta.toLocaleString("ja-JP")}回${video.isProvisional ? ` (${video.snapshotDays}日)` : ""}`
+                    : "データ蓄積中"
+                }
               />
             ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border surface-card px-5 py-10 text-center text-sm text-muted-foreground">
+            比較可能な動画データ（2点以上の収集履歴）が不足しているか、現在データ収集中です。
           </div>
         )}
       </section>
@@ -239,9 +243,15 @@ function Index() {
               <div key={i} className="h-[68px] rounded-xl border surface-card animate-pulse" />
             ))}
           </div>
+        ) : rankings.isError ? (
+          <div className="text-center py-12 text-destructive border border-dashed border-destructive/40 rounded-xl surface-card text-sm bg-destructive/5">
+            チャンネルランキングデータの取得に失敗しました。
+          </div>
         ) : visibleList.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl surface-card text-sm">
-            データがありません。絞り込み条件を変えてみてください。
+            {query.trim() || category !== "all"
+              ? "条件に該当するチャンネルがありません。絞り込み条件を変えてみてください。"
+              : `${period}日前の比較対象データが不足しているか、現在データ収集中です。`}
           </div>
         ) : (
           <div className="space-y-2">

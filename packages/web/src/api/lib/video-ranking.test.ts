@@ -56,10 +56,37 @@ describe("video trend calculation", () => {
     expect(calculateVideoTrend([
       { date: "2026-07-17", viewCount: 180 },
       { date: "2026-07-10", viewCount: 100 },
-    ], 7)).toMatchObject({ hasTrend: true, viewDelta: 80, comparisonStatus: "ready" });
+    ], 7)).toMatchObject({ hasTrend: true, viewDelta: 80, comparisonStatus: "ready", isProvisional: false, snapshotDays: 7 });
   });
 
   test("reports insufficient history without inventing a trend", () => {
     expect(calculateVideoTrend([{ date: "2026-07-17", viewCount: 180 }], 7)).toMatchObject({ hasTrend: false, viewDelta: 0, comparisonStatus: "insufficient" });
+  });
+
+  test("checks 1-day, 2-day, and 4-day intervals for daily period", () => {
+    // 1-day difference: ready, isProvisional = false
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 180 },
+      { date: "2026-07-16", viewCount: 100 },
+    ], 1)).toMatchObject({ hasTrend: true, viewDelta: 80, comparisonStatus: "ready", isProvisional: false, snapshotDays: 1 });
+
+    // 2-day difference: ready, isProvisional = true
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 180 },
+      { date: "2026-07-15", viewCount: 100 },
+    ], 1)).toMatchObject({ hasTrend: true, viewDelta: 80, comparisonStatus: "ready", isProvisional: true, snapshotDays: 2 });
+
+    // 4-day difference: outside daily range limit (1..3), so insufficient
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 180 },
+      { date: "2026-07-13", viewCount: 100 },
+    ], 1)).toMatchObject({ hasTrend: false, viewDelta: 0, comparisonStatus: "insufficient" });
+  });
+
+  test("handles zero increase (viewDelta = 0) properly", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 100 },
+      { date: "2026-07-16", viewCount: 100 },
+    ], 1)).toMatchObject({ hasTrend: true, viewDelta: 0, comparisonStatus: "ready", isProvisional: false });
   });
 });

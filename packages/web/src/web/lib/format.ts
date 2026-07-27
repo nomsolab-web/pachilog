@@ -14,6 +14,12 @@ export function formatJapaneseCount(value: number | null | undefined, unit = "")
 export function formatJapaneseDate(value: string | null | undefined) {
   if (!value) return "データ未取得";
 
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [_, y, m, d] = match;
+    return `${y}年${parseInt(m, 10)}月${parseInt(d, 10)}日`;
+  }
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
@@ -21,6 +27,7 @@ export function formatJapaneseDate(value: string | null | undefined) {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "Asia/Tokyo",
   }).format(date);
 }
 

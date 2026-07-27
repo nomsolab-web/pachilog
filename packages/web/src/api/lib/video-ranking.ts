@@ -19,11 +19,11 @@ export function calculateVideoTrend(snapshots: readonly VideoSnapshotForRanking[
   return {
     latestDate: comparison.latest?.date ?? null,
     baseDate: hasTrend ? comparison.base?.date ?? null : null,
-    snapshotDays: snapshots.length,
+    snapshotDays: comparison.comparisonDays,
     comparisonStatus: comparison.status,
     comparisonStartDate: comparison.comparisonStartDate,
     comparisonEndDate: comparison.comparisonEndDate,
-    isProvisional: false,
+    isProvisional: comparison.isProvisional,
     hasTrend,
     viewDelta,
     viewDeltaPct: Number(viewDeltaPct.toFixed(2)),
