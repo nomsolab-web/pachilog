@@ -19,7 +19,7 @@ export type SeedMachine = {
 // Keep the original five rows in fresh databases. Duplicate names are merged
 // with the newer catalog, while distinct legacy rows remain registered.
 export const LEGACY_SEED_MACHINES: SeedMachine[] = [
-  { name: "Lパチスロ からくりサーカス2", maker: "SANKYO", type: "pachislot", releaseDate: "2026-07-06", sourceUrl: "https://www.sankyo-fever.jp/products/" },
+  { name: "Lパチスロ からくりサーカス2", maker: "SANKYO", type: "slot", releaseDate: "2026-07-06", sourceUrl: "https://www.sankyo-fever.jp/products/" },
   { name: "P/eフィーバーブルーロック Light ver.", maker: "SANKYO", type: "pachinko", releaseDate: "2026-07-06", sourceUrl: "https://www.sankyo-fever.jp/products/machine_list/pwr/" },
   { name: "eフィーバー デッドマウント・デスプレイ 魂神9000", maker: "SANKYO", type: "pachinko", releaseDate: "2026-06-08", sourceUrl: "https://www.sankyo-fever.jp/products/" },
   { name: "ぱちんこ 必殺仕事人VI", maker: "オッケー.", type: "pachinko", releaseDate: "2026-07-06", sourceUrl: "https://www.p-world.co.jp/machine/database/10472" },

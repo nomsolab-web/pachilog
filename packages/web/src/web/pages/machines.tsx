@@ -3,9 +3,40 @@ import { useQuery } from "@tanstack/react-query";
 import { Eye, Flame, Video, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
+import { machineTypeLabel, normalizeMachineType, type MachineType } from "../../shared/machine-type";
+
+export type MachineFilterType = MachineType | "all";
+
+export function normalizeMachineList<T extends { type?: unknown }>(machines: readonly T[]) {
+  return machines.map((machine) => ({ ...machine, type: normalizeMachineType(machine.type) }));
+}
+
+export function filterMachineList<T extends { type?: unknown; releaseDate?: string | null }>(
+  machines: readonly T[],
+  selectedType: MachineFilterType,
+  selectedMonth: string,
+) {
+  return machines.filter((machine) => {
+    const typeMatches = selectedType === "all" || normalizeMachineType(machine.type) === selectedType;
+    const monthMatches = selectedMonth === "all" || !!machine.releaseDate?.startsWith(selectedMonth);
+    return typeMatches && monthMatches;
+  });
+}
+
+export function countMachineTypes<T extends { type?: unknown }>(machines: readonly T[]) {
+  return machines.reduce(
+    (counts, machine) => {
+      const type = normalizeMachineType(machine.type);
+      if (type) counts[type] += 1;
+      else counts.unknown += 1;
+      return counts;
+    },
+    { pachinko: 0, slot: 0, unknown: 0 },
+  );
+}
 
 function MachinesPage() {
-  const [selectedType, setSelectedType] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<MachineFilterType>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   const machines = useQuery({
@@ -15,7 +46,7 @@ function MachinesPage() {
 
   const releaseMonths = useMemo(() => {
     if (!machines.data || !("machines" in machines.data)) return [];
-    const months = machines.data.machines
+    const months = normalizeMachineList(machines.data.machines)
       .map((m) => (m.releaseDate ? m.releaseDate.substring(0, 7) : null))
       .filter((m): m is string => !!m);
     return [...new Set(months)].sort().reverse();
@@ -23,14 +54,13 @@ function MachinesPage() {
 
   const filteredMachines = useMemo(() => {
     if (!machines.data || !("machines" in machines.data)) return [];
-    return machines.data.machines.filter((m) => {
-      const typeMatches = selectedType === "all" || m.type === selectedType;
-      const monthMatches =
-        selectedMonth === "all" ||
-        (m.releaseDate && m.releaseDate.startsWith(selectedMonth));
-      return typeMatches && monthMatches;
-    });
+    return filterMachineList(normalizeMachineList(machines.data.machines), selectedType, selectedMonth);
   }, [machines.data, selectedType, selectedMonth]);
+
+  const machineCounts = useMemo(
+    () => machines.data && "machines" in machines.data ? countMachineTypes(machines.data.machines) : { pachinko: 0, slot: 0, unknown: 0 },
+    [machines.data],
+  );
 
   return (
     <div>
@@ -76,6 +106,11 @@ function MachinesPage() {
           >
             パチスロ
           </button>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>パチンコ {machineCounts.pachinko}</span>
+          <span>パチスロ {machineCounts.slot}</span>
+          {machineCounts.unknown > 0 && <span>未設定 {machineCounts.unknown}</span>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -124,11 +159,11 @@ function MachinesPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-semibold truncate">{machine.name}</h2>
-                  {machine.type && (
+                  {machineTypeLabel(machine.type) && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                      machine.type === "pachinko" ? "bg-primary/10 text-primary border border-primary/20" : "bg-gold/10 text-gold border border-gold/20"
+                      machine.type === "pachinko" ? "bg-primary/10 text-primary border border-primary/20" : machine.type === "slot" ? "bg-gold/10 text-gold border border-gold/20" : "bg-secondary text-muted-foreground border border-border"
                     }`}>
-                      {machine.type === "pachinko" ? "パチンコ" : "パチスロ"}
+                      {machineTypeLabel(machine.type)}
                     </span>
                   )}
                 </div>

@@ -7,11 +7,15 @@ import { isRankableVideoContentType, isVideoContentType, RANKABLE_VIDEO_CONTENT_
 import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, countMachineContentTypes, selectConfirmedMachineVideos, selectRankableMachineVideos } from "../lib/machine-content";
 import { isMachineVoteType, isPlainRecord, machineVoteStatus, validateVoterFingerprint } from "../lib/machine-votes";
 import { calculateVideoTrend, sortVideoRankingEntries } from "../lib/video-ranking";
+import { normalizeMachineType } from "../../shared/machine-type";
 
 export function createMachinesRoute(db: typeof defaultDb) {
   const route = new Hono()
     .get("/", async (c) => {
-      const list = await db.select().from(machines);
+      const list = (await db.select().from(machines)).map((machine) => ({
+        ...machine,
+        type: normalizeMachineType(machine.type),
+      }));
       const rows = await db
         .select({
           machineId: videoMachineLinks.machineId,
@@ -57,6 +61,7 @@ export function createMachinesRoute(db: typeof defaultDb) {
       const sort = parseSort(c.req.query("sort"));
       const [machine] = await db.select().from(machines).where(eq(machines.id, id));
       if (!machine) return c.json({ error: "not found" }, 404);
+      const normalizedMachine = { ...machine, type: normalizeMachineType(machine.type) };
 
       const linkedVideos = await db
         .select({
@@ -123,7 +128,7 @@ export function createMachinesRoute(db: typeof defaultDb) {
 
       return c.json(
         {
-          machine,
+          machine: normalizedMachine,
           mentions: videosForDisplay,
           contentTypes,
           contentTypeCounts: countMachineContentTypes(allConfirmedVideos),

@@ -13,7 +13,7 @@ const p = (name: string, maker: string, releaseDate: string, sourceUrl: string):
 const s = (name: string, maker: string, releaseDate: string): SeedMachine => ({
   name,
   maker,
-  type: "pachislot",
+  type: "slot",
   releaseDate,
   sourceUrl: slotList,
 });
