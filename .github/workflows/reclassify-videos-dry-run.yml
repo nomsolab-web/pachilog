@@ -2,6 +2,15 @@ name: Reclassify videos dry-run
 
 on:
   workflow_dispatch:
+    inputs:
+      refresh_metadata:
+        description: Refresh video metadata before reclassification
+        type: boolean
+        default: true
+      apply:
+        description: Apply reclassification changes to production
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,7 +47,16 @@ jobs:
         shell: bash
         run: |
           cd packages/web
-          bun run data:reclassify-videos -- --refresh-metadata | tee "$GITHUB_STEP_SUMMARY"
+          args=()
+          if [ "${{ inputs.refresh_metadata }}" = "true" ]; then
+            args+=(--refresh-metadata)
+          fi
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            echo "::warning::Production apply mode enabled. This run will apply changes to production."
+            echo "Production apply mode enabled. This run will apply changes to production." >> "$GITHUB_STEP_SUMMARY"
+            args+=(--apply)
+          fi
+          bun run data:reclassify-videos -- "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload dry-run report
         if: always()
