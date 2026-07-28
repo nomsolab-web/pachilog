@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../database";
-import { machineMentions, machineVideoJudgments, machineVotes, machines, videoMachineLinks } from "../database/schema";
+import { machineMentions, machineVideoJudgments, machineVotes, machines, videos, videoMachineLinks } from "../database/schema";
+import { selectRankableMachineVideos } from "../lib/machine-content";
 import { machineIdentityKey } from "../lib/machine-identity";
 
 export const DUPLICATE_MACHINE_GROUPS = [
@@ -26,6 +27,13 @@ export const DUPLICATE_MACHINE_GROUPS = [
 
 type MachineRecord = typeof machines.$inferSelect;
 type LinkRecord = typeof videoMachineLinks.$inferSelect;
+type RankableLinkRecord = {
+  machineId: number;
+  videoId: string;
+  matchMethod: string;
+  matchStatus: string | null;
+  contentType: "standard" | "short" | "live" | "promotion" | "unknown";
+};
 
 export function validateDuplicateGroup(
   canonical: MachineRecord | undefined,
@@ -225,16 +233,55 @@ export async function runDuplicateMachineMerge(apply: boolean) {
     db.select().from(machineVotes).where(inArray(machineVotes.machineId, ids)),
     db.select().from(machineVideoJudgments).where(inArray(machineVideoJudgments.machineId, ids)),
   ]);
+  const rankingRows: RankableLinkRecord[] = ids.length > 0
+    ? await db
+      .select({
+        machineId: videoMachineLinks.machineId,
+        videoId: videoMachineLinks.videoId,
+        matchMethod: videoMachineLinks.matchMethod,
+        matchStatus: videos.matchStatus,
+        contentType: videos.contentType,
+      })
+      .from(videoMachineLinks)
+      .innerJoin(videos, eq(videoMachineLinks.videoId, videos.videoId))
+      .where(inArray(videoMachineLinks.machineId, ids))
+    : [];
+  const rankableRows = selectRankableMachineVideos(rankingRows);
   const groupCounts = pendingGroups.map((group) => ({
     canonicalId: group.canonicalId,
     duplicateId: group.duplicateId,
+    label: group.label,
+    machines: {
+      canonical: machineDryRunSummary(byId.get(group.canonicalId), links, rankableRows, group.canonicalId),
+      duplicate: machineDryRunSummary(byId.get(group.duplicateId), links, rankableRows, group.duplicateId),
+    },
     linksBefore: links.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).length,
     linksAfter: new Set(links.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).map((row) => row.videoId)).size,
+    duplicateLinksToMove: links.filter((row) => row.machineId === group.duplicateId).length,
+    duplicateLinksDeduplicated: links.filter((row) => row.machineId === group.duplicateId && links.some((other) => other.machineId === group.canonicalId && other.videoId === row.videoId)).length,
     mentionsBefore: mentions.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).length,
     mentionsAfter: new Set(mentions.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).map((row) => row.videoId)).size,
     votesBefore: votes.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).length,
     votesAfter: new Set(votes.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).map((row) => row.voterFingerprint)).size,
     judgmentsToMove: judgments.filter((row) => row.machineId === group.duplicateId).length,
+    keepMachineId: group.canonicalId,
+    duplicateRecordAction: byId.get(group.duplicateId)
+      ? { action: "delete", machineId: group.duplicateId, name: byId.get(group.duplicateId)?.name ?? null }
+      : { action: "none", machineId: group.duplicateId, reason: "already absent" },
+    rankingConsolidation: {
+      beforeMachineIds: [group.canonicalId, group.duplicateId].filter((id) => byId.has(id)),
+      afterMachineIds: [group.canonicalId],
+      expectedSingleRankingEntry: byId.has(group.canonicalId) && byId.has(group.duplicateId),
+      rankableVideosBefore: {
+        canonical: uniqueVideoCount(rankableRows, group.canonicalId),
+        duplicate: uniqueVideoCount(rankableRows, group.duplicateId),
+      },
+      rankableVideosAfter: new Set(rankableRows.filter((row) => row.machineId === group.canonicalId || row.machineId === group.duplicateId).map((row) => row.videoId)).size,
+    },
+    otherMachineImpact: {
+      affectedMachineIds: [group.canonicalId, group.duplicateId],
+      outsideMachineRowsChanged: 0,
+    },
   }));
   const report = { groups: validated, groupCounts, linksBefore: links.length, linksAfter: groupCounts.reduce((sum, group) => sum + group.linksAfter, 0), mentionsBefore: mentions.length, mentionsAfter: groupCounts.reduce((sum, group) => sum + group.mentionsAfter, 0), votesBefore: votes.length, votesAfter: groupCounts.reduce((sum, group) => sum + group.votesAfter, 0), judgmentsBefore: judgments.length, judgmentsToMove: groupCounts.reduce((sum, group) => sum + group.judgmentsToMove, 0), applied: false };
   if (!apply) return report;
@@ -249,12 +296,36 @@ export async function runDuplicateMachineMerge(apply: boolean) {
   return { ...report, applied: true, verification };
 }
 
+function machineDryRunSummary(
+  machine: MachineRecord | undefined,
+  links: readonly LinkRecord[],
+  rankableRows: readonly RankableLinkRecord[],
+  machineId: number,
+) {
+  const machineLinks = links.filter((row) => row.machineId === machineId);
+  return {
+    id: machineId,
+    exists: !!machine,
+    name: machine?.name ?? null,
+    maker: machine?.maker ?? null,
+    releaseDate: machine?.releaseDate ?? null,
+    linkedVideoCount: new Set(machineLinks.map((row) => row.videoId)).size,
+    videoMachineLinksCount: machineLinks.length,
+    rankableVideoCount: uniqueVideoCount(rankableRows, machineId),
+  };
+}
+
+function uniqueVideoCount(rows: readonly { machineId: number; videoId: string }[], machineId: number) {
+  return new Set(rows.filter((row) => row.machineId === machineId).map((row) => row.videoId)).size;
+}
+
 if (import.meta.main) {
   const apply = process.argv.includes("--apply");
+  const jsonOnly = process.argv.includes("--json");
   runDuplicateMachineMerge(apply)
     .then((report) => {
       console.log(JSON.stringify(report, null, 2));
-      if (!apply) console.log("Dry-run only. Re-run with --apply to execute the transactional merge.");
+      if (!apply && !jsonOnly) console.log("Dry-run only. Re-run with --apply to execute the transactional merge.");
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : error);
