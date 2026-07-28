@@ -103,7 +103,7 @@ describe("videos trending content type data integration", () => {
     expect(apiRequests.at(-1)?.contentType).toBe("short");
 
     const standardTab = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.includes("通常動画"),
+      (button) => button.textContent?.includes("実践動画"),
     );
     expect(standardTab).toBeDefined();
     act(() => standardTab!.click());

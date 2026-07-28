@@ -89,7 +89,7 @@ function MachinePage() {
             <Stat icon={<Video className="size-3.5" />} label="関連動画" value={summary.videoCount} hint="すべての動画種別" />
             <Stat icon={<CalendarDays className="size-3.5" />} label="直近7日の新着" value={summary.recentVideoCount} hint="公開日基準" />
             <Stat icon={<TrendingUp className="size-3.5" />} label="7日間の再生増加" value={summary.recentViews} hint="履歴比較" />
-            <Stat icon={<Eye className="size-3.5" />} label="ランキング対象" value={summary.rankingVideoCount} hint="通常動画・ショート・ライブ" />
+            <Stat icon={<Eye className="size-3.5" />} label="ランキング対象" value={summary.rankingVideoCount} hint="実践動画・ショート・ライブ" />
           </div>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">最終更新: {formatDateTime(summary.lastUpdatedAt)}</p>
@@ -102,7 +102,7 @@ function MachinePage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-lg font-semibold">関連動画一覧</h2>
-            <p className="mt-1 text-xs text-muted-foreground">関連動画は確定済みのすべての動画種別。ランキング対象は通常動画・ショート・ライブで、広告・分類不明の動画は除外します。</p>
+            <p className="mt-1 text-xs text-muted-foreground">関連動画は確定済みのすべての動画種別。ランキング対象は実践動画・ショート・ライブで、広告・分類不明の動画は除外します。</p>
           </div>
           <div className="segmented-control flex gap-1 rounded-lg border p-1">
             {(["rising", "newest", "views"] as const).map((mode) => (
