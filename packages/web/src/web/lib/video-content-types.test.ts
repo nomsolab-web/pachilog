@@ -20,7 +20,7 @@ describe("video content type tabs", () => {
 
   test("maps tab labels to API contentType values", () => {
     expect(VIDEO_CONTENT_TYPE_TABS.map((tab) => [tab.value, tab.label])).toEqual([
-      ["standard", "通常動画"],
+      ["standard", "実践動画"],
       ["short", "ショート"],
       ["live", "ライブ"],
       ["promotion", "公式PV・CM"],
