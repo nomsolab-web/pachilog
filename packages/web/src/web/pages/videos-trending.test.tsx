@@ -26,7 +26,7 @@ describe("videos trending content type UI", () => {
       <ContentTypeTabs active="standard" counts={{ standard: 12, short: 3 }} onChange={() => undefined} />,
     );
 
-    expect(html).toContain("通常動画");
+    expect(html).toContain("実践動画");
     expect(html).toContain("12");
     expect(html).toContain("ショート");
     expect(html).toContain("3");

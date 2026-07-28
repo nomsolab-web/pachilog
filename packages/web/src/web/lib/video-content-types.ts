@@ -5,7 +5,7 @@ export type VideoContentTypeValue = (typeof VIDEO_CONTENT_TYPE_VALUES)[number];
 export type VideoContentTypeTab = { value: VideoContentTypeValue; label: string };
 
 export const VIDEO_CONTENT_TYPE_TABS: VideoContentTypeTab[] = [
-  { value: "standard", label: "通常動画" },
+  { value: "standard", label: "実践動画" },
   { value: "short", label: "ショート" },
   { value: "live", label: "ライブ" },
   { value: "promotion", label: "公式PV・CM" },

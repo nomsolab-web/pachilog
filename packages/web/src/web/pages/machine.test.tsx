@@ -110,7 +110,7 @@ describe("MachinePage tab & URL query parameter synchronization", () => {
 
     const { container, unmount } = render(<MachinePage />);
     const standardTab = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.includes("通常動画")
+      (btn) => btn.textContent?.includes("実践動画")
     );
     expect(standardTab).toBeDefined();
     expect(standardTab!.className).toContain("text-gold");
@@ -145,7 +145,7 @@ describe("MachinePage tab & URL query parameter synchronization", () => {
     expect(container.textContent).toContain("short video");
 
     const standardTab = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.includes("通常動画"),
+      (btn) => btn.textContent?.includes("実践動画"),
     );
     expect(standardTab).toBeDefined();
     act(() => {
