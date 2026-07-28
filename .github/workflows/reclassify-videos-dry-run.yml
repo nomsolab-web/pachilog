@@ -54,6 +54,7 @@ jobs:
           if [ "${{ inputs.apply }}" = "true" ]; then
             echo "::warning::Production apply mode enabled. This run will apply changes to production."
             echo "Production apply mode enabled. This run will apply changes to production." >> "$GITHUB_STEP_SUMMARY"
+            export RECLASSIFY_VIDEOS_ALLOW_WRITE=1
             args+=(--apply)
           fi
           bun run data:reclassify-videos -- "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
