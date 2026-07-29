@@ -1,0 +1,55 @@
+name: Merge Dead Mount duplicate dry-run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    environment: pachilog_secret
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          for name in DATABASE_URL DATABASE_AUTH_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub Actions secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run read-only Dead Mount duplicate dry-run
+        shell: bash
+        run: |
+          echo "Running read-only dry-run for canonical ID 6 and duplicate ID 80."
+          bun run --cwd packages/web data:merge-dead-mount-duplicate | tee dead-mount-duplicate-dry-run.json
+          {
+            echo "## Dead Mount Duplicate Merge Dry-run"
+            echo
+            echo '```json'
+            cat dead-mount-duplicate-dry-run.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dry-run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-mount-duplicate-dry-run
+          path: dead-mount-duplicate-dry-run.json
+          if-no-files-found: error

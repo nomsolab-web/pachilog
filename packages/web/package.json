@@ -22,6 +22,7 @@
     "data:diagnose-machine-vote-duplicates": "bun --env-file=../../.env src/api/data/diagnose-machine-vote-duplicates.ts",
     "data:rebuild-machine-mentions": "bun --env-file=../../.env src/api/data/rebuild-machine-mentions.ts",
     "data:merge-duplicate-machines": "bun --env-file=../../.env src/api/data/merge-duplicate-machines.ts",
+    "data:merge-dead-mount-duplicate": "bun --env-file=../../.env src/api/data/merge-dead-mount-duplicate.ts",
     "data:inspect-machine-duplicate-candidates": "bun --env-file=../../.env src/api/data/inspect-machine-duplicate-candidates.ts",
     "data:reclassify-videos": "bun --env-file=../../.env src/api/data/reclassify-videos.ts"
   },
