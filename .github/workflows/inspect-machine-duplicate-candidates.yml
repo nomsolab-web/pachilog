@@ -1,0 +1,61 @@
+name: Inspect machine duplicate candidates
+
+on:
+  workflow_dispatch:
+    inputs:
+      machine_ids:
+        description: Space-separated machine IDs to inspect
+        type: string
+        default: "6 80"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    environment: pachilog_secret
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          for name in DATABASE_URL DATABASE_AUTH_TOKEN; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub Actions secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run read-only machine duplicate inspection
+        shell: bash
+        run: |
+          read -r -a machine_ids <<< "${{ inputs.machine_ids }}"
+          echo "Inspecting machine IDs: ${machine_ids[*]}"
+          bun run --cwd packages/web data:inspect-machine-duplicate-candidates -- "${machine_ids[@]}" | tee machine-duplicate-candidates-report.json
+          {
+            echo "## Machine Duplicate Candidate Inspection"
+            echo
+            echo '```json'
+            cat machine-duplicate-candidates-report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload inspection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-duplicate-candidates-report
+          path: machine-duplicate-candidates-report.json
+          if-no-files-found: error

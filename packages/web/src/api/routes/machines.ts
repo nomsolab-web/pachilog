@@ -20,6 +20,7 @@ export function createMachinesRoute(db: typeof defaultDb) {
         .select({
           machineId: videoMachineLinks.machineId,
           videoId: videos.videoId,
+          channelId: videos.channelId,
           viewCount: videos.viewCount,
           contentType: videos.contentType,
           matchStatus: videos.matchStatus,
@@ -35,12 +36,16 @@ export function createMachinesRoute(db: typeof defaultDb) {
           ? await db.select().from(videoSnapshots).where(inArray(videoSnapshots.videoId, videoIds)).orderBy(desc(videoSnapshots.date))
           : [];
       const snapshotsByVideoId = groupSnapshotsByVideoId(snapshots);
-      const statsByMachine = new Map<number, { totalViews: number; videoCount: number; recentViews: number; recentVideoCount: number }>();
+      const statsByMachine = new Map<number, { totalViews: number; videoCount: number; recentViews: number; recentVideoCount: number; channelCount: number; videoIds: Set<string>; channelIds: Set<number> }>();
 
       for (const row of rankableRows) {
-        const stats = statsByMachine.get(row.machineId) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0 };
+        const stats = statsByMachine.get(row.machineId) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0, channelCount: 0, videoIds: new Set<string>(), channelIds: new Set<number>() };
+        if (stats.videoIds.has(row.videoId)) continue;
+        stats.videoIds.add(row.videoId);
+        stats.channelIds.add(row.channelId);
         stats.totalViews += row.viewCount;
-        stats.videoCount += 1;
+        stats.videoCount = stats.videoIds.size;
+        stats.channelCount = stats.channelIds.size;
         const trend = calculateVideoTrend(snapshotsByVideoId.get(row.videoId) ?? [], 7);
         if (trend.hasTrend) {
           stats.recentViews += Math.max(0, trend.viewDelta);
@@ -49,7 +54,17 @@ export function createMachinesRoute(db: typeof defaultDb) {
         statsByMachine.set(row.machineId, stats);
       }
 
-      const withBuzz = list.map((machine) => ({ ...machine, ...(statsByMachine.get(machine.id) ?? { totalViews: 0, videoCount: 0, recentViews: 0, recentVideoCount: 0 }) }));
+      const withBuzz = list.map((machine) => {
+        const stats = statsByMachine.get(machine.id);
+        return {
+          ...machine,
+          totalViews: stats?.totalViews ?? 0,
+          videoCount: stats?.videoCount ?? 0,
+          recentViews: stats?.recentViews ?? 0,
+          recentVideoCount: stats?.recentVideoCount ?? 0,
+          channelCount: stats?.channelCount ?? 0,
+        };
+      });
 
       // Sort by momentum (recentViews) descending
       withBuzz.sort((a, b) => b.recentViews - a.recentViews || b.totalViews - a.totalViews);
