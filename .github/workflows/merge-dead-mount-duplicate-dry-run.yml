@@ -23,6 +23,8 @@ jobs:
       - name: Validate required secrets
         shell: bash
         run: |
+          set -euo pipefail
+
           for name in DATABASE_URL DATABASE_AUTH_TOKEN; do
             if [ -z "${!name:-}" ]; then
               echo "Missing required GitHub Actions secret: ${name}" >&2
@@ -36,6 +38,8 @@ jobs:
       - name: Run read-only Dead Mount duplicate dry-run
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "Running read-only dry-run for canonical ID 6 and duplicate ID 80."
           bun run --cwd packages/web data:merge-dead-mount-duplicate | tee dead-mount-duplicate-dry-run.json
           {
