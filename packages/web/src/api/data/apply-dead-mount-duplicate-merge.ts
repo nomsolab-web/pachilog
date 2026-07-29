@@ -220,6 +220,7 @@ function buildReport(input: {
       machineVotes: { count: input.movedMachineVotes.length, ids: input.movedMachineVotes },
       machineVideoJudgments: { count: input.movedMachineVideoJudgments.length, ids: input.movedMachineVideoJudgments },
     },
+    aliasesToAdd: [...DEAD_MOUNT_DUPLICATE_APPLY.aliasesToAdd],
     addedAliases: input.addedAliases,
     deletedMachineId: input.deletedMachineId,
     verification: input.verification,
