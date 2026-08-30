@@ -1,7 +1,7 @@
 import app from "./api";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
-import { COLLECTION_IDLE_TIMEOUT_SECONDS } from "./api/lib/collection-runtime";
+import { disableCollectionRequestTimeout } from "./api/lib/request-timeout";
 
 const port = Number(process.env.PORT ?? 3000);
 const distDir = `${import.meta.dir}/../dist`;
@@ -12,12 +12,10 @@ const INDEX_CACHE = "no-cache";
 
 const server = Bun.serve({
   port,
-  // Collection endpoints can legitimately run for several minutes. The
-  // workflow also splits the long-running phases, but keep the HTTP boundary
-  // above the expected collection duration.
-  idleTimeout: COLLECTION_IDLE_TIMEOUT_SECONDS,
-  async fetch(request) {
+  idleTimeout: 255,
+  async fetch(request, server) {
     const url = new URL(request.url);
+    disableCollectionRequestTimeout(url.pathname, request, server);
 
     if (url.pathname.startsWith("/api")) {
       try {
