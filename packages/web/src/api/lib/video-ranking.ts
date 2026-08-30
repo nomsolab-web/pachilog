@@ -15,13 +15,20 @@ export type VideoComparisonMode = "previous" | "7d";
 const MAX_PREVIOUS_GAP_HOURS = 72;
 const MIN_SEVEN_DAY_GAP_DAYS = 5;
 const MAX_SEVEN_DAY_GAP_DAYS = 9;
+const DEFAULT_MAX_LATEST_AGE_HOURS = 72;
+
+export type VideoTrendOptions = {
+  referenceCollectedAt?: Date | string | number | null;
+  maxLatestAgeHours?: number;
+};
 
 export function calculateVideoTrend(
   snapshots: readonly VideoSnapshotForRanking[],
   period: number,
   mode: VideoComparisonMode = period === 7 ? "7d" : "previous",
+  options: VideoTrendOptions = {},
 ) {
-  const comparison = selectVideoComparisonSnapshots(snapshots, mode);
+  const comparison = selectVideoComparisonSnapshots(snapshots, mode, options);
   const hasTrend = !!comparison.latest && !!comparison.base && comparison.status === "ready";
   const viewDelta = hasTrend ? comparison.latest!.viewCount - comparison.base!.viewCount : 0;
   const viewDeltaPct = hasTrend && comparison.base!.viewCount > 0 ? (viewDelta / comparison.base!.viewCount) * 100 : 0;
@@ -31,6 +38,8 @@ export function calculateVideoTrend(
     latestViewCount: comparison.latest?.viewCount ?? null,
     latestCollectedAt: comparison.latest ? toIsoString(comparison.latest.collectedAt) : null,
     baseCollectedAt: hasTrend ? toIsoString(comparison.base?.collectedAt) : null,
+    referenceCollectedAt: toIsoString(options.referenceCollectedAt),
+    latestAgeHours: comparison.latestAgeHours,
     comparisonHours: hasTrend ? comparison.comparisonHours : 0,
     snapshotDays: comparison.comparisonDays,
     comparisonStatus: comparison.status,
@@ -46,6 +55,7 @@ export function calculateVideoTrend(
 export function selectVideoComparisonSnapshots(
   snapshots: readonly VideoSnapshotForRanking[],
   mode: VideoComparisonMode,
+  options: VideoTrendOptions = {},
 ) {
   const valid = snapshots
     .filter((snapshot) => Number.isFinite(snapshot.viewCount) && snapshot.viewCount >= 0)
@@ -53,14 +63,21 @@ export function selectVideoComparisonSnapshots(
   const latest = valid[0] ?? null;
   if (!latest) return insufficientVideoComparison(null, null);
 
+  const referenceTime = toTimestamp(options.referenceCollectedAt);
+  const latestTime = snapshotTime(latest);
+  const latestAgeHours = referenceTime === null ? null : Math.round((referenceTime - latestTime) / (60 * 60 * 1000));
+  if (latestAgeHours !== null && (latestAgeHours < 0 || latestAgeHours > (options.maxLatestAgeHours ?? DEFAULT_MAX_LATEST_AGE_HOURS))) {
+    return insufficientVideoComparison(latest, null, 0, latestAgeHours);
+  }
+
   if (mode === "previous") {
     const base = valid[1] ?? null;
     if (!base) return insufficientVideoComparison(latest, null);
     const comparisonHours = hoursBetween(base, latest);
     if (comparisonHours <= 0 || comparisonHours > MAX_PREVIOUS_GAP_HOURS) {
-      return insufficientVideoComparison(latest, base, comparisonHours);
+      return insufficientVideoComparison(latest, base, comparisonHours, latestAgeHours);
     }
-    return readyVideoComparison(latest, base, comparisonHours, 1);
+    return readyVideoComparison(latest, base, comparisonHours, 1, latestAgeHours);
   }
 
   const target = snapshotTime(latest) - 7 * 24 * 60 * 60 * 1000;
@@ -71,17 +88,18 @@ export function selectVideoComparisonSnapshots(
   const comparisonHours = hoursBetween(base, latest);
   const comparisonDays = comparisonHours / 24;
   if (comparisonDays < MIN_SEVEN_DAY_GAP_DAYS || comparisonDays > MAX_SEVEN_DAY_GAP_DAYS) {
-    return insufficientVideoComparison(latest, base, comparisonHours);
+    return insufficientVideoComparison(latest, base, comparisonHours, latestAgeHours);
   }
-  return readyVideoComparison(latest, base, comparisonHours, 7);
+  return readyVideoComparison(latest, base, comparisonHours, 7, latestAgeHours);
 }
 
-function readyVideoComparison(latest: VideoSnapshotForRanking, base: VideoSnapshotForRanking, comparisonHours: number, expectedDays: number) {
+function readyVideoComparison(latest: VideoSnapshotForRanking, base: VideoSnapshotForRanking, comparisonHours: number, expectedDays: number, latestAgeHours: number | null) {
   const comparisonDays = Math.round(comparisonHours / 24);
   return {
     latest,
     base,
     comparisonHours,
+    latestAgeHours,
     comparisonDays,
     comparisonStartDate: base.date,
     comparisonEndDate: latest.date,
@@ -94,11 +112,13 @@ function insufficientVideoComparison(
   latest: VideoSnapshotForRanking | null,
   base: VideoSnapshotForRanking | null,
   comparisonHours = 0,
+  latestAgeHours: number | null = null,
 ) {
   return {
     latest,
     base: null,
     comparisonHours,
+    latestAgeHours,
     comparisonDays: 0,
     comparisonStartDate: null,
     comparisonEndDate: latest?.date ?? null,
@@ -127,6 +147,12 @@ function toIsoString(value: Date | string | number | null | undefined) {
   if (value === null || value === undefined) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function toTimestamp(value: Date | string | number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const timestamp = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 export type VideoRankingCursor = {

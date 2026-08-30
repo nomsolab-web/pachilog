@@ -77,6 +77,12 @@ export function createVideosRoute(db: typeof defaultDb) {
             .where(inArray(videoSnapshots.videoId, videoIds))
             .orderBy(desc(videoSnapshots.date), desc(videoSnapshots.collectedAt))
         : [];
+    const referenceSnapshot = await db
+      .select({ collectedAt: videoSnapshots.collectedAt })
+      .from(videoSnapshots)
+      .orderBy(desc(videoSnapshots.collectedAt), desc(videoSnapshots.date))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
     const snapshotsByVideoId = new Map<string, typeof snapshotRows>();
     for (const snapshot of snapshotRows) {
       const list = snapshotsByVideoId.get(snapshot.videoId) ?? [];
@@ -89,7 +95,10 @@ export function createVideosRoute(db: typeof defaultDb) {
         return {
           ...video,
           machineTags: machineTagsByVideoId.get(video.videoId) ?? [],
-          ...calculateVideoTrend(snapshots, period, mode as "previous" | "7d"),
+          ...calculateVideoTrend(snapshots, period, mode as "previous" | "7d", {
+            referenceCollectedAt: referenceSnapshot?.collectedAt,
+            maxLatestAgeHours: 72,
+          }),
         };
       });
 
@@ -109,6 +118,7 @@ export function createVideosRoute(db: typeof defaultDb) {
         limit,
         nextCursor: page.nextCursor,
         counts,
+        referenceCollectedAt: referenceSnapshot?.collectedAt?.toISOString() ?? null,
         videos: page.page,
         queryPlan: { videos: 1, snapshots: 1, contentTypeCounts: 1 },
       },
