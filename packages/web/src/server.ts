@@ -1,6 +1,7 @@
 import app from "./api";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
+import { COLLECTION_IDLE_TIMEOUT_SECONDS } from "./api/lib/collection-runtime";
 
 const port = Number(process.env.PORT ?? 3000);
 const distDir = `${import.meta.dir}/../dist`;
@@ -11,7 +12,10 @@ const INDEX_CACHE = "no-cache";
 
 const server = Bun.serve({
   port,
-  idleTimeout: 255,
+  // Collection endpoints can legitimately run for several minutes. The
+  // workflow also splits the long-running phases, but keep the HTTP boundary
+  // above the expected collection duration.
+  idleTimeout: COLLECTION_IDLE_TIMEOUT_SECONDS,
   async fetch(request) {
     const url = new URL(request.url);
 
@@ -46,6 +50,15 @@ const server = Bun.serve({
 });
 
 console.log(`Web server listening on http://localhost:${server.port}`);
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception", error);
+  process.exitCode = 1;
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection", reason);
+  process.exitCode = 1;
+});
 
 function getStaticFilePath(pathname: string) {
   const cleanPath = decodeURIComponent(pathname)
