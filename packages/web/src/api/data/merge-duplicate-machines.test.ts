@@ -47,7 +47,7 @@ describe("duplicate machine merge planning", () => {
     );
     expect(merged.name).toBe("eフィーバー デッドマウント・デスプレイ 魂神9000");
     expect(merged.shortName).toBe("short");
-    expect(merged.aliases).toEqual(["canonical", "duplicate"]);
+    expect(merged.aliases).toEqual(["canonical", "duplicate", "eフィーバー デッドマウント・デスプレイ 魂神9000"]);
     expect(merged.uniqueAliases).toEqual(["unique"]);
     expect(merged.officialUrl).toBe("official");
   });

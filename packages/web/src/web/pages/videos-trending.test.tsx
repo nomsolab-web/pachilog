@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ContentTypeTabs, EmptyState, ErrorState, LoadingGrid, useVideoTrendingUrlState } from "./videos-trending";
-import { normalizeContentTypeSearchParams, videoTrendMetricLabel } from "../lib/video-content-types";
+import { normalizeContentTypeSearchParams, videoTrendMetricLabel, videoTrendingQueryParams, VIDEO_CONTENT_TYPE_TABS } from "../lib/video-content-types";
 
 describe("videos trending content type UI", () => {
   test("restores the selected tab and falls back safely", () => {
@@ -37,6 +37,21 @@ describe("videos trending content type UI", () => {
     expect(renderToStaticMarkup(<LoadingGrid />)).toContain("animate-pulse");
     expect(renderToStaticMarkup(<EmptyState />)).toContain("この種別の動画はまだありません");
     expect(renderToStaticMarkup(<ErrorState onRetry={() => undefined} />)).toContain("動画データを取得できませんでした");
+  });
+
+  test("uses the selected comparison period and content type for both modes", () => {
+    expect(videoTrendingQueryParams("previous", "standard")).toEqual({ mode: "previous", contentType: "standard", limit: "20" });
+    expect(videoTrendingQueryParams("7d", "promotion")).toEqual({ mode: "7d", contentType: "promotion", limit: "20" });
+  });
+
+  test("exposes all supported content-type tabs", () => {
+    expect(VIDEO_CONTENT_TYPE_TABS.map((tab) => tab.value)).toEqual([
+      "standard",
+      "short",
+      "live",
+      "promotion",
+      "unknown",
+    ]);
   });
 
   test("keeps provisional day suffix in video metrics", () => {

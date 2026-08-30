@@ -76,4 +76,13 @@ describe("video content type tabs", () => {
     expect(videoTrendMetricLabel({ hasTrend: true, viewDelta: 1234, viewDeltaPct: 12.34, isProvisional: true, snapshotDays: 3 })).toContain("(3日)");
     expect(videoTrendMetricLabel({ hasTrend: false, viewDelta: 0, viewDeltaPct: 0 })).toBe("データ蓄積中");
   });
+
+  test("shows the actual previous-collection interval", () => {
+    expect(videoTrendMetricLabel({
+      hasTrend: true,
+      viewDelta: 12345,
+      viewDeltaPct: 2.5,
+      comparisonHours: 23,
+    } as any)).toContain("23時間");
+  });
 });

@@ -4,6 +4,7 @@ import {
   decodeVideoRankingCursor,
   encodeVideoRankingCursor,
   paginateVideoRanking,
+  selectTrendingVideoEntries,
   sortVideoRankingEntries,
 } from "./video-ranking";
 
@@ -51,7 +52,56 @@ describe("video ranking pagination", () => {
   });
 });
 
+describe("video ranking selection", () => {
+  test("keeps every content type eligible after the tab filter", () => {
+    const entries = selectTrendingVideoEntries([
+      { videoId: "standard", currentViewCount: 100, viewDelta: 5, contentType: "standard" },
+      { videoId: "promotion", currentViewCount: 90, viewDelta: 8, contentType: "promotion" },
+      { videoId: "unknown", currentViewCount: 80, viewDelta: 3, contentType: "unknown" },
+      { videoId: "flat", currentViewCount: 70, viewDelta: 0, contentType: "live" },
+    ]);
+    expect(entries.map((entry) => entry.videoId)).toEqual(["promotion", "standard", "unknown"]);
+  });
+});
+
 describe("video trend calculation", () => {
+  test("uses only the latest two collected snapshots for previous mode", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-08-30", viewCount: 1_108_064, collectedAt: "2026-08-30T01:00:00.000Z" },
+      { date: "2026-08-29", viewCount: 1_100_000, collectedAt: "2026-08-29T01:00:00.000Z" },
+      { date: "2026-07-16", viewCount: 773_746, collectedAt: "2026-07-16T01:00:00.000Z" },
+    ], 1, "previous")).toMatchObject({
+      hasTrend: true,
+      viewDelta: 8_064,
+      baseCollectedAt: "2026-08-29T01:00:00.000Z",
+      latestCollectedAt: "2026-08-30T01:00:00.000Z",
+      comparisonHours: 24,
+    });
+  });
+
+  test("does not rank a video when its previous snapshot is too old", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-08-30", viewCount: 1_108_064, collectedAt: "2026-08-30T01:00:00.000Z" },
+      { date: "2026-07-16", viewCount: 773_746, collectedAt: "2026-07-16T01:00:00.000Z" },
+    ], 1, "previous")).toMatchObject({ hasTrend: false, comparisonStatus: "insufficient", viewDelta: 0 });
+  });
+
+  test("uses the nearest valid snapshot to seven days before the latest", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-08-30", viewCount: 200, collectedAt: "2026-08-30T02:00:00.000Z" },
+      { date: "2026-08-23", viewCount: 100, collectedAt: "2026-08-23T02:00:00.000Z" },
+      { date: "2026-08-22", viewCount: 20, collectedAt: "2026-08-22T02:00:00.000Z" },
+    ], 7, "7d")).toMatchObject({ hasTrend: true, viewDelta: 100, snapshotDays: 7, comparisonHours: 168 });
+  });
+
+  test("is deterministic when the same snapshots are processed again", () => {
+    const snapshots = [
+      { date: "2026-08-30", viewCount: 200, collectedAt: "2026-08-30T02:00:00.000Z" },
+      { date: "2026-08-29", viewCount: 100, collectedAt: "2026-08-29T02:00:00.000Z" },
+    ];
+    expect(calculateVideoTrend(snapshots, 1, "previous")).toEqual(calculateVideoTrend(snapshots, 1, "previous"));
+  });
+
   test("uses the same seven-day comparison as the global ranking", () => {
     expect(calculateVideoTrend([
       { date: "2026-07-17", viewCount: 180 },

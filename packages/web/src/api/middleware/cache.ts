@@ -6,6 +6,7 @@ const NO_STORE = "no-store";
 
 const CACHEABLE_GET_PREFIXES = ["/api/channels", "/api/rankings", "/api/machines", "/api/videos", "/api/weekly"];
 const NO_STORE_PREFIXES = ["/api/collect", "/api/collect-machines"];
+const DYNAMIC_RANKING_PREFIXES = ["/api/rankings", "/api/videos"];
 
 export const httpCache = createMiddleware(async (c, next) => {
   await next();
@@ -46,7 +47,7 @@ function isCacheableGetPath(path: string) {
 
 function isNoStorePath(path: string) {
   if (path.endsWith("/votes") || path.includes("/votes/")) return true;
-  return NO_STORE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  return [...NO_STORE_PREFIXES, ...DYNAMIC_RANKING_PREFIXES].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
 function createWeakEtag(body: string) {

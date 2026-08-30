@@ -72,7 +72,21 @@ export function machineDetailQueryParams(contentType: VideoContentTypeValue, sor
   return { contentType, sort };
 }
 
-export function videoTrendMetricLabel(video: { hasTrend: boolean; viewDelta: number; viewDeltaPct: number; isProvisional?: boolean; snapshotDays?: number }) {
+export function videoTrendMetricLabel(video: { hasTrend: boolean; viewDelta: number; viewDeltaPct: number; isProvisional?: boolean; snapshotDays?: number; comparisonHours?: number }) {
+  if (video.hasTrend && video.comparisonHours !== undefined) {
+    return "+" + video.viewDelta.toLocaleString("ja-JP") + "回（前回取得から" + video.comparisonHours + "時間）";
+  }
   if (!video.hasTrend) return "データ蓄積中";
   return `+${video.viewDelta.toLocaleString("ja-JP")}回 / ${video.viewDeltaPct.toFixed(1)}%${video.isProvisional ? ` (${video.snapshotDays ?? 0}日)` : ""}`;
+}
+
+export function videoTrendMetricLabelWithPeriod(
+  video: { hasTrend: boolean; viewDelta: number; viewDeltaPct: number; snapshotDays?: number; comparisonHours?: number },
+  mode: "previous" | "7d",
+) {
+  if (!video.hasTrend) return "データ蓄積中";
+  const comparison = mode === "previous"
+    ? "前回取得から" + (video.comparisonHours ?? 0) + "時間"
+    : (video.snapshotDays ?? 0) + "日間";
+  return "+" + video.viewDelta.toLocaleString("ja-JP") + "回 / " + video.viewDeltaPct.toFixed(1) + "%（" + comparison + "）";
 }

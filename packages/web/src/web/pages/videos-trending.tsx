@@ -9,7 +9,7 @@ import {
   normalizeContentTypeSearchParams,
   parseVideoContentType,
   updateContentTypeSearchParams,
-  videoTrendMetricLabel,
+  videoTrendMetricLabelWithPeriod,
   videoTrendingQueryParams,
   useSearch,
   type VideoContentTypeValue,
@@ -124,7 +124,7 @@ function VideosTrendingPage() {
                   channelThumbnailUrl={video.channelThumbnailUrl}
                   contentType={video.contentType}
                   machineTags={video.machineTags}
-                  metric={videoTrendMetricLabel(video)}
+                  metric={videoTrendMetricLabelWithPeriod(video, mode)}
                 />
               </div>
             ))}

@@ -37,7 +37,7 @@ function Index() {
   });
   const trendingVideos = useQuery({
     queryKey: ["videos-trending", "previous", "top"],
-    queryFn: async () => (await api.videos.trending.$get({ query: { mode: "previous" } })).json(),
+    queryFn: async () => (await api.videos.trending.$get({ query: { mode: "previous", contentType: "standard", limit: "20" } })).json(),
   });
   const machines = useQuery({
     queryKey: ["machines"],
@@ -69,6 +69,13 @@ function Index() {
     .slice(0, 5); // Limit to top 5 on homepage for above-the-fold visibility
 
   const latestDate = rankings.data && !("error" in rankings.data) ? rankings.data.latestDate : null;
+  const updateStatus = rankings.isLoading
+    ? "loading"
+    : rankings.isError || !rankings.data || "error" in rankings.data
+      ? "error"
+      : latestDate
+        ? "ready"
+        : "empty";
 
   const trendingMachinesList = useMemo(() => {
     if (!machines.data || !("machines" in machines.data)) return [];
@@ -89,7 +96,9 @@ function Index() {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 bg-background/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-border/40">
           <CalendarDays className="size-3.5 text-gold" />
-          <span>最終更新: {formatJapaneseDate(latestDate)}</span>
+          <span>
+            最終更新: {latestUpdateLabel(updateStatus, latestDate)}
+          </span>
         </div>
       </section>
 
@@ -372,6 +381,13 @@ function Index() {
       </section>
     </div>
   );
+}
+
+export function latestUpdateLabel(status: "loading" | "ready" | "empty" | "error", latestDate: string | null) {
+  if (status === "loading") return "読み込み中";
+  if (status === "error") return "取得失敗";
+  if (status === "empty") return "データなし";
+  return formatJapaneseDate(latestDate);
 }
 
 export default Index;

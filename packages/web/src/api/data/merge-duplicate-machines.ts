@@ -82,7 +82,8 @@ export function mergeMachineMetadataValues(
     thumbnailUrl: scalar(canonical.thumbnailUrl, duplicate.thumbnailUrl),
     sourceUrl: scalar(canonical.sourceUrl, duplicate.sourceUrl),
     officialUrl: scalar(canonical.officialUrl, duplicate.officialUrl),
-    aliases: unionStrings(canonical.aliases, duplicate.aliases),
+    // Keep the duplicate's visible name searchable after its row is removed.
+    aliases: unionStrings(canonical.aliases, duplicate.aliases, [duplicate.name]),
     uniqueAliases: unionStrings(canonical.uniqueAliases, duplicate.uniqueAliases),
     ambiguousAliases: unionStrings(canonical.ambiguousAliases, duplicate.ambiguousAliases),
     resolvingKeywords: unionStrings(canonical.resolvingKeywords, duplicate.resolvingKeywords),
@@ -169,8 +170,20 @@ async function mergeVotes(tx: any, canonicalId: number, duplicateId: number) {
 }
 
 async function mergeJudgments(tx: any, canonicalId: number, duplicateId: number) {
-  const result = await tx.update(machineVideoJudgments).set({ machineId: canonicalId }).where(eq(machineVideoJudgments.machineId, duplicateId));
-  return { updated: result.rowsAffected ?? 0 };
+  const rows = await tx
+    .select()
+    .from(machineVideoJudgments)
+    .where(inArray(machineVideoJudgments.machineId, [canonicalId, duplicateId]));
+  const byKey = new Map<string, typeof rows[number]>();
+  for (const row of rows) {
+    const current = byKey.get(row.judgmentKey);
+    if (!current || (current.machineId === duplicateId && row.machineId === canonicalId)) byKey.set(row.judgmentKey, row);
+  }
+  for (const row of rows) await tx.delete(machineVideoJudgments).where(eq(machineVideoJudgments.id, row.id));
+  for (const row of byKey.values()) {
+    await tx.insert(machineVideoJudgments).values({ ...row, id: undefined, machineId: canonicalId });
+  }
+  return { updated: rows.filter((row: typeof rows[number]) => row.machineId === duplicateId).length, after: byKey.size };
 }
 
 export async function mergeDuplicateMachineGroup(tx: any, group: (typeof DUPLICATE_MACHINE_GROUPS)[number]) {

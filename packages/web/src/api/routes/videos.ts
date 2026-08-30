@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db as defaultDb } from "../database";
 import { channels, machines, videos, videoMachineLinks, videoSnapshots } from "../database/schema";
-import { isRankableVideoContentType, isVideoContentType, type VideoContentType } from "../lib/content-type";
+import { isVideoContentType, type VideoContentType } from "../lib/content-type";
 import { clampLimit } from "../lib/pagination";
 import { CONFIRMED_MATCH_STATUS, EXCLUDED_MACHINE_LINK_METHOD, selectConfirmedMachineVideos } from "../lib/machine-content";
-import { calculateVideoTrend, decodeVideoRankingCursor, paginateVideoRanking, sortVideoRankingEntries } from "../lib/video-ranking";
+import { calculateVideoTrend, decodeVideoRankingCursor, paginateVideoRanking, selectTrendingVideoEntries } from "../lib/video-ranking";
 
 const MODES = new Set(["previous", "7d"]);
 const MAX_LIMIT = 100;
@@ -32,7 +32,7 @@ export function createVideosRoute(db: typeof defaultDb) {
     const limit = clampLimit(c.req.query("limit"), 50, MAX_LIMIT);
     const cursor = decodeVideoRankingCursor(c.req.query("cursor"));
     const contentTypes = parseContentTypes(c.req.query("contentType") ?? "standard");
-    const where = contentTypes.length === 1 ? eq(videos.contentType, contentTypes[0]) : inArray(videos.contentType, contentTypes);
+    const where = contentTypes.length === 1 ? eq(videos.contentType, contentTypes[0]!) : inArray(videos.contentType, contentTypes);
 
     const videoRows = await db
       .select({
@@ -89,11 +89,16 @@ export function createVideosRoute(db: typeof defaultDb) {
         return {
           ...video,
           machineTags: machineTagsByVideoId.get(video.videoId) ?? [],
-          ...calculateVideoTrend(snapshots, period),
+          ...calculateVideoTrend(snapshots, period, mode as "previous" | "7d"),
         };
       });
 
-    const ranked = sortVideoRankingEntries(entries.filter((entry) => entry.viewDelta > 0 && isRankableVideoContentType(entry.contentType)));
+    // The selected tab is the content-type filter. Promotional and unknown videos
+    // must remain eligible so their dedicated tabs can display results.
+    const ranked = selectTrendingVideoEntries(entries).map((entry) => ({
+      ...entry,
+      currentViewCount: entry.latestViewCount ?? entry.currentViewCount,
+    }));
     const page = paginateVideoRanking(ranked, limit, cursor);
     const counts = await contentTypeCounts();
     return c.json(
