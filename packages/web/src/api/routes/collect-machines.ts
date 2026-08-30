@@ -13,6 +13,7 @@ import {
 import { findDetailedMachineMatches } from "../lib/machine-match";
 import { buildAiCandidates, runAiMachineJudgments, type AiCandidate } from "../lib/machine-ai";
 import { classifyVideoContent } from "../lib/content-type";
+import { batchVideoIds, DEFAULT_VIDEO_TRACKING_DAYS, DEFAULT_VIDEO_TRACKING_MAX, selectTrackedVideoIds } from "../lib/video-tracking";
 
 export function createCollectMachinesRoute(db: typeof defaultDb) {
   const route = new Hono();
@@ -32,12 +33,17 @@ export function createCollectMachinesRoute(db: typeof defaultDb) {
       videoSnapshotsInserted: 0,
       videoSnapshotsSkippedExisting: 0,
       youtubeVideoStatCalls: 0,
+      trackingTargetCount: 0,
+      trackingSuccessCount: 0,
+      trackingFailedCount: 0,
+      trackingSnapshotInsertedCount: 0,
       failedChannels: 0,
       ai: null as Awaited<ReturnType<typeof runAiMachineJudgments>> | null,
       errors: [] as string[],
     };
     const aiCandidates: AiCandidate[] = [];
     const date = dateStringInTimeZone();
+    const discoveredVideoIds = new Set<string>();
 
     const machineList = await db.select().from(machines);
     if (machineList.length === 0) {
@@ -68,6 +74,7 @@ export function createCollectMachinesRoute(db: typeof defaultDb) {
         results.youtubeVideoStatCalls += Math.ceil(new Set(videos.map((video) => video.videoId)).size / 50);
         const statsMap = new Map(stats.map((s) => [s.videoId, s]));
         const videoIds = videos.map((v) => v.videoId);
+        for (const videoId of videoIds) discoveredVideoIds.add(videoId);
 
         // 1. Fetch all existing videos for these video IDs in a single batch query
         const existingVideos = await db
@@ -314,6 +321,62 @@ export function createCollectMachinesRoute(db: typeof defaultDb) {
       }
     });
 
+    // Discovery only scans the newest playlist entries. Refresh recent existing
+    // videos separately so fast-publishing channels do not freeze their trends.
+    const activeChannelIds = new Set(activeChannels.map((channel) => channel.id));
+    const trackingRows = await db.select({
+      videoId: videosTable.videoId,
+      channelId: videosTable.channelId,
+      publishedAt: videosTable.publishedAt,
+      updatedAt: videosTable.updatedAt,
+    }).from(videosTable);
+    const trackingDays = parsePositiveInt(process.env.VIDEO_TRACKING_DAYS, DEFAULT_VIDEO_TRACKING_DAYS);
+    const trackingMax = parsePositiveInt(process.env.VIDEO_TRACKING_MAX, DEFAULT_VIDEO_TRACKING_MAX);
+    const trackingIds = selectTrackedVideoIds(trackingRows, activeChannelIds, new Date(), trackingDays, trackingMax, discoveredVideoIds);
+    results.trackingTargetCount = trackingIds.length;
+
+    for (const batch of batchVideoIds(trackingIds)) {
+      let stats: Awaited<ReturnType<typeof fetchVideoStats>> = [];
+      try {
+        stats = await fetchVideoStats(batch);
+        results.youtubeVideoStatCalls += 1;
+      } catch (err) {
+        results.trackingFailedCount += batch.length;
+        results.errors.push(`video tracking batch failed: ${(err as Error).message}`);
+        continue;
+      }
+
+      const statsMap = new Map(stats.map((stat) => [stat.videoId, stat]));
+      results.trackingSuccessCount += stats.length;
+      results.trackingFailedCount += batch.length - stats.length;
+      const existingSnapshots = await db.select({ videoId: videoSnapshots.videoId }).from(videoSnapshots).where(
+        and(inArray(videoSnapshots.videoId, batch), eq(videoSnapshots.date, date)),
+      );
+      const snapshotIds = new Set(existingSnapshots.map((snapshot) => snapshot.videoId));
+      for (const videoId of batch) {
+        const stat = statsMap.get(videoId);
+        if (!stat) continue;
+        await db.update(videosTable).set({
+          viewCount: stat.viewCount,
+          likeCount: stat.likeCount,
+          commentCount: stat.commentCount,
+          durationSeconds: stat.durationSeconds,
+          liveBroadcastContent: stat.liveBroadcastContent,
+          updatedAt: new Date(),
+        }).where(eq(videosTable.videoId, videoId));
+        if (!snapshotIds.has(videoId)) {
+          await db.insert(videoSnapshots).values({
+            videoId,
+            date,
+            viewCount: stat.viewCount,
+            likeCount: stat.likeCount,
+            commentCount: stat.commentCount,
+          });
+          results.trackingSnapshotInsertedCount += 1;
+        }
+      }
+    }
+
     results.ai = await runAiMachineJudgments(aiCandidates);
     console.log("Machine AI judgment summary", {
       skipped: results.ai.skipped,
@@ -332,3 +395,8 @@ export function createCollectMachinesRoute(db: typeof defaultDb) {
 }
 
 export const collectMachines = createCollectMachinesRoute(defaultDb);
+
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}

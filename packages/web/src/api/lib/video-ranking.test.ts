@@ -86,12 +86,47 @@ describe("video trend calculation", () => {
     ], 1, "previous")).toMatchObject({ hasTrend: false, comparisonStatus: "insufficient", viewDelta: 0 });
   });
 
+  test("does not rank a month-old pair even when the pair is 24 hours apart", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 1_108_064, collectedAt: "2026-07-17T01:00:00.000Z" },
+      { date: "2026-07-16", viewCount: 773_746, collectedAt: "2026-07-16T01:00:00.000Z" },
+    ], 1, "previous", { referenceCollectedAt: "2026-08-30T01:00:00.000Z", maxLatestAgeHours: 72 })).toMatchObject({
+      hasTrend: false,
+      comparisonStatus: "insufficient",
+      viewDelta: 0,
+      latestAgeHours: 1056,
+    });
+  });
+
+  test("ranks a recent pair against the global collection reference", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-08-30", viewCount: 200, collectedAt: "2026-08-30T01:00:00.000Z" },
+      { date: "2026-08-29", viewCount: 100, collectedAt: "2026-08-29T01:00:00.000Z" },
+    ], 1, "previous", { referenceCollectedAt: "2026-08-30T02:00:00.000Z" })).toMatchObject({
+      hasTrend: true,
+      viewDelta: 100,
+      latestAgeHours: 1,
+      referenceCollectedAt: "2026-08-30T02:00:00.000Z",
+    });
+  });
+
   test("uses the nearest valid snapshot to seven days before the latest", () => {
     expect(calculateVideoTrend([
       { date: "2026-08-30", viewCount: 200, collectedAt: "2026-08-30T02:00:00.000Z" },
       { date: "2026-08-23", viewCount: 100, collectedAt: "2026-08-23T02:00:00.000Z" },
       { date: "2026-08-22", viewCount: 20, collectedAt: "2026-08-22T02:00:00.000Z" },
     ], 7, "7d")).toMatchObject({ hasTrend: true, viewDelta: 100, snapshotDays: 7, comparisonHours: 168 });
+  });
+
+  test("applies the global freshness check to seven-day trends", () => {
+    expect(calculateVideoTrend([
+      { date: "2026-07-17", viewCount: 180, collectedAt: "2026-07-17T00:00:00.000Z" },
+      { date: "2026-07-10", viewCount: 100, collectedAt: "2026-07-10T00:00:00.000Z" },
+    ], 7, "7d", { referenceCollectedAt: "2026-08-30T00:00:00.000Z" })).toMatchObject({
+      hasTrend: false,
+      comparisonStatus: "insufficient",
+      viewDelta: 0,
+    });
   });
 
   test("is deterministic when the same snapshots are processed again", () => {
