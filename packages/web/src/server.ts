@@ -1,6 +1,7 @@
 import app from "./api";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
+import { disableCollectionRequestTimeout } from "./api/lib/request-timeout";
 
 const port = Number(process.env.PORT ?? 3000);
 const distDir = `${import.meta.dir}/../dist`;
@@ -12,8 +13,9 @@ const INDEX_CACHE = "no-cache";
 const server = Bun.serve({
   port,
   idleTimeout: 255,
-  async fetch(request) {
+  async fetch(request, server) {
     const url = new URL(request.url);
+    disableCollectionRequestTimeout(url.pathname, request, server);
 
     if (url.pathname.startsWith("/api")) {
       try {
@@ -46,6 +48,15 @@ const server = Bun.serve({
 });
 
 console.log(`Web server listening on http://localhost:${server.port}`);
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception", error);
+  process.exitCode = 1;
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection", reason);
+  process.exitCode = 1;
+});
 
 function getStaticFilePath(pathname: string) {
   const cleanPath = decodeURIComponent(pathname)
